@@ -879,3 +879,840 @@ balanced_reviews_df[
         "clean_text",
     ]
 ].head(15)
+
+"""Набор стал сбалансированным, т.к. 1692 записи образованы тремя классами одинакового размера, по 564 отзыва на класс, и этого достаточно для сравнения легких моделей и небольшой нейронной сети. Для глубокой модели набор остается ограниченным; качество нейронной сети будет оцениваться рядом с более простыми методами, без заранее заданного преимущества.
+
+В выборке встречаются отдельные посторонние рубрики, но основной состав связан со строительными магазинами, жилыми комплексами, недвижимостью, дверями, сантехническими работами, строительными рынками и отделочными направлениями. Сравнение моделей покажет, какой подход лучше извлекает признаки тональности из очищенного текста. В эксперимент добавляются несколько моделей разной сложности, несколько метрик, матрица ошибок, график сравнения качества и схема нейронной сети. Метод TfidfVectorizer переводит тексты в числовые признаки на основе частоты слова и редкости слова в корпусе, classification_report рассчитывает точность, полноту и F-меру, а confusion_matrix показывает распределение правильных и ошибочных ответов по классам. Для глубокой модели используется слой TextVectorization, который разбивает текст на слова и переводит слова в числовые индексы, а слой Embedding формирует обучаемые числовые представления слов.
+
+# 6. Сравнение моделей разной сложности
+
+На этапе сравнения проверяются несколько подходов к классификации тональности отзывов. В качестве базовых решений используются модели, которые работают с числовыми признаками текста, полученными через частоту слов с учетом редкости слова в корпусе. Модели быстро обучаются и дают понятную основу для последующей интеграции в веб-приложение.
+
+Дополнительно строится небольшая нейронная сеть для обработки последовательности слов. Модель получает очищенный текст, переводит слова в числовые индексы, формирует обучаемые числовые представления слов и классифицирует отзыв по трем классам тональности. Сравнение проводится по точности, полноте, F-мере и доле правильных ответов; результаты сохраняются в таблицах и графиках для отчета.
+"""
+
+# Подключаем библиотеки для разбиения данных, построения моделей и оценки качества.
+# train_test_split делит таблицу на обучающую, проверочную и контрольную части.
+# Pipeline объединяет преобразование текста и модель в единую цепочку обработки.
+# TfidfVectorizer переводит текст в числовые признаки на основе частоты слов
+# и редкости слов в корпусе.
+# Модели ниже относятся к разным семействам методов классификации.
+
+import time
+import warnings
+
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import LabelEncoder
+
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier
+
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    classification_report,
+    confusion_matrix,
+    ConfusionMatrixDisplay,
+)
+
+
+# Подключаем библиотеку TensorFlow для построения нейронной сети.
+# TensorFlow содержит средства обучения моделей глубокого обучения.
+# Keras — удобный интерфейс TensorFlow для описания слоев нейронной сети.
+
+import tensorflow as tf
+from tensorflow.keras import layers
+from tensorflow.keras.callbacks import EarlyStopping
+
+
+# Отключаем предупреждения, которые не влияют на ход эксперимента.
+# Такая настройка делает вывод ячеек компактнее.
+
+warnings.filterwarnings("ignore")
+
+
+# Фиксируем начальные числа случайных процедур.
+# Повторный запуск ячеек будет давать близкие результаты разбиения и обучения.
+
+np.random.seed(RANDOM_STATE)
+random.seed(RANDOM_STATE)
+tf.random.set_seed(RANDOM_STATE)
+
+# Загружаем сбалансированный набор, сохраненный на предыдущем этапе.
+# Чтение из файла подтверждает, что дальнейший эксперимент использует
+# именно сохраненный обучающий материал.
+
+processed_dataset_path = processed_data_dir / "irbis_feedback_dataset.csv"
+
+modeling_df = pd.read_csv(
+    processed_dataset_path,
+    encoding="utf-8-sig"
+)
+
+
+# Удаляем строки с отсутствующим текстом или классом тональности.
+# Такая проверка защищает обучение от случайных пустых значений.
+
+modeling_df = modeling_df.dropna(
+    subset=["clean_text", "sentiment"]
+).copy()
+
+
+# Приводим текст и класс тональности к строковому виду.
+# Для классификации нужны текстовый признак и целевой класс.
+
+modeling_df["clean_text"] = modeling_df["clean_text"].astype(str)
+modeling_df["sentiment"] = modeling_df["sentiment"].astype(str)
+
+
+# Удаляем возможные полные повторы текста.
+# Повторы могут облегчить контрольную проверку и завысить метрики.
+
+modeling_df = modeling_df.drop_duplicates(
+    subset=["clean_text"]
+).reset_index(drop=True)
+
+
+# Формируем массив текстов и массив классов.
+# X хранит тексты отзывов.
+# y хранит классы тональности.
+
+X = modeling_df["clean_text"]
+y = modeling_df["sentiment"]
+
+
+# Сохраняем список классов в устойчивом порядке.
+# Список понадобится для отчетов и матрицы ошибок.
+
+class_names = sorted(y.unique())
+
+
+# Делим данные на обучающую и временную части.
+# stratify сохраняет одинаковое соотношение классов в каждой части выборки.
+
+X_train, X_temp, y_train, y_temp = train_test_split(
+    X,
+    y,
+    test_size=0.30,
+    random_state=RANDOM_STATE,
+    stratify=y
+)
+
+
+# Делим временную часть на проверочную и контрольную части.
+# Проверочная часть нужна для выбора лучшей модели.
+# Контрольная часть останется для итоговой оценки на следующем этапе.
+
+X_valid, X_test, y_valid, y_test = train_test_split(
+    X_temp,
+    y_temp,
+    test_size=0.50,
+    random_state=RANDOM_STATE,
+    stratify=y_temp
+)
+
+
+# Формируем таблицу с размерами выборок.
+
+split_overview = pd.DataFrame(
+    {
+        "Часть данных": [
+            "Обучающая часть",
+            "Проверочная часть",
+            "Контрольная часть",
+        ],
+        "Количество отзывов": [
+            len(X_train),
+            len(X_valid),
+            len(X_test),
+        ],
+    }
+)
+
+split_overview
+
+# Проверяем распределение классов в обучающей, проверочной и контрольной частях.
+# Равномерное распределение классов важно для честного сравнения моделей.
+
+split_distribution = pd.concat(
+    [
+        y_train.value_counts().sort_index().rename("Обучающая часть"),
+        y_valid.value_counts().sort_index().rename("Проверочная часть"),
+        y_test.value_counts().sort_index().rename("Контрольная часть"),
+    ],
+    axis=1
+).fillna(0).astype(int)
+
+split_distribution
+
+# Задаем функцию оценки качества модели.
+# Функция рассчитывает несколько метрик для сопоставления моделей.
+# Доля правильных ответов показывает общий процент совпадений.
+# Точность показывает долю верных ответов среди ответов выбранного класса.
+# Полнота показывает долю найденных объектов выбранного класса.
+# F-мера объединяет точность и полноту в один показатель.
+
+def calculate_metrics(model_name, model_type, y_true, y_pred, train_seconds):
+    metrics_row = {
+        "Модель": model_name,
+        "Тип модели": model_type,
+        "Доля правильных ответов": accuracy_score(y_true, y_pred),
+        "Точность средняя": precision_score(
+            y_true,
+            y_pred,
+            average="macro",
+            zero_division=0
+        ),
+        "Полнота средняя": recall_score(
+            y_true,
+            y_pred,
+            average="macro",
+            zero_division=0
+        ),
+        "F-мера средняя": f1_score(
+            y_true,
+            y_pred,
+            average="macro",
+            zero_division=0
+        ),
+        "Время обучения, секунд": train_seconds,
+    }
+
+    return metrics_row
+
+
+# Задаем функцию построения подробного отчета по классам.
+# Отчет показывает качество отдельно для отрицательных, нейтральных
+# и положительных отзывов.
+
+def make_classification_report_table(model_name, y_true, y_pred):
+    report_dict = classification_report(
+        y_true,
+        y_pred,
+        labels=class_names,
+        target_names=class_names,
+        output_dict=True,
+        zero_division=0
+    )
+
+    report_rows = []
+
+    for class_name in class_names:
+        report_rows.append(
+            {
+                "Модель": model_name,
+                "Класс тональности": class_name,
+                "Точность": report_dict[class_name]["precision"],
+                "Полнота": report_dict[class_name]["recall"],
+                "F-мера": report_dict[class_name]["f1-score"],
+                "Количество отзывов": report_dict[class_name]["support"],
+            }
+        )
+
+    return pd.DataFrame(report_rows)
+
+# Создаем набор классических моделей.
+# Все модели получают одинаковое преобразование текста через TfidfVectorizer.
+# TfidfVectorizer строит числовые признаки текста на основе слов и пар соседних слов.
+# Пары соседних слов помогают учитывать короткие выражения вроде плохой сервис
+# или отличный специалист.
+
+classical_models = {
+    "Наивный байесовский классификатор": MultinomialNB(),
+    "Логистическая регрессия": LogisticRegression(
+        max_iter=2000,
+        class_weight="balanced",
+        random_state=RANDOM_STATE
+    ),
+    "Линейный метод опорных векторов": LinearSVC(
+        class_weight="balanced",
+        random_state=RANDOM_STATE
+    ),
+    "Случайный лес": RandomForestClassifier(
+        n_estimators=250,
+        max_depth=None,
+        class_weight="balanced",
+        random_state=RANDOM_STATE,
+        n_jobs=-1
+    ),
+}
+
+
+# Общие параметры преобразования текста.
+# max_features ограничивает число признаков, чтобы обучение оставалось быстрым.
+# ngram_range=(1, 2) означает учет отдельных слов и пар соседних слов.
+# min_df=2 убирает слова, которые встретились только в одном отзыве.
+# sublinear_tf сглаживает влияние очень частых слов.
+
+tfidf_parameters = {
+    "max_features": 8000,
+    "ngram_range": (1, 2),
+    "min_df": 2,
+    "sublinear_tf": True,
+}
+
+
+# Обучаем классические модели и оцениваем их на проверочной части.
+# Модели сохраняются в памяти для выбора лучшего кандидата.
+# Файлы моделей на этом этапе не сохраняются, чтобы не создавать лишние артефакты.
+
+trained_classical_models = {}
+model_metrics = []
+class_reports = []
+
+for model_name, classifier in classical_models.items():
+    model_pipeline = Pipeline(
+        steps=[
+            (
+                "text_features",
+                TfidfVectorizer(**tfidf_parameters)
+            ),
+            (
+                "classifier",
+                classifier
+            ),
+        ]
+    )
+
+    start_time = time.time()
+    model_pipeline.fit(X_train, y_train)
+    train_seconds = round(time.time() - start_time, 4)
+
+    valid_pred = model_pipeline.predict(X_valid)
+
+    model_metrics.append(
+        calculate_metrics(
+            model_name=model_name,
+            model_type="Классическая модель",
+            y_true=y_valid,
+            y_pred=valid_pred,
+            train_seconds=train_seconds
+        )
+    )
+
+    class_reports.append(
+        make_classification_report_table(
+            model_name=model_name,
+            y_true=y_valid,
+            y_pred=valid_pred
+        )
+    )
+
+    trained_classical_models[model_name] = model_pipeline
+
+# Подготавливаем метки классов для нейронной сети.
+# Нейронная сеть получает классы в числовом виде, поэтому строки negative,
+# neutral и positive преобразуются в целые числа.
+
+label_encoder = LabelEncoder()
+label_encoder.fit(class_names)
+
+y_train_encoded = label_encoder.transform(y_train)
+y_valid_encoded = label_encoder.transform(y_valid)
+y_test_encoded = label_encoder.transform(y_test)
+
+number_of_classes = len(class_names)
+
+
+# Создаем слой преобразования текста.
+# TextVectorization разбивает текст на слова и заменяет слова числовыми индексами.
+# max_tokens ограничивает размер словаря.
+# output_sequence_length задает единую длину последовательности слов.
+
+max_tokens = 12000
+sequence_length = 180
+
+text_vectorizer = layers.TextVectorization(
+    max_tokens=max_tokens,
+    output_mode="int",
+    output_sequence_length=sequence_length,
+    standardize="lower_and_strip_punctuation"
+)
+
+
+# Настраиваем словарь слоя только по обучающим текстам.
+# Проверочная и контрольная части не участвуют в построении словаря,
+# чтобы не переносить сведения из проверки в обучение.
+
+text_vectorizer.adapt(np.array(X_train))
+
+
+# Создаем нейронную сеть для классификации текста.
+# Вход принимает строку с отзывом.
+# Слой Embedding формирует обучаемые числовые представления слов.
+# Двунаправленный слой LSTM обрабатывает последовательность слов слева направо
+# и справа налево, чтобы учитывать соседние слова с двух сторон.
+# Полносвязные слои выполняют итоговое разделение на классы тональности.
+
+deep_input = tf.keras.Input(
+    shape=(),
+    dtype=tf.string,
+    name="review_text"
+)
+
+deep_features = text_vectorizer(deep_input)
+
+deep_features = layers.Embedding(
+    input_dim=max_tokens,
+    output_dim=64,
+    mask_zero=True,
+    name="word_representation"
+)(deep_features)
+
+deep_features = layers.Bidirectional(
+    layers.LSTM(
+        32,
+        return_sequences=True
+    ),
+    name="bidirectional_sequence_layer"
+)(deep_features)
+
+deep_features = layers.GlobalMaxPooling1D(
+    name="sequence_pooling"
+)(deep_features)
+
+deep_features = layers.Dropout(
+    0.30,
+    name="random_neuron_shutdown"
+)(deep_features)
+
+deep_features = layers.Dense(
+    32,
+    activation="relu",
+    name="hidden_decision_layer"
+)(deep_features)
+
+deep_features = layers.Dropout(
+    0.20,
+    name="second_random_neuron_shutdown"
+)(deep_features)
+
+deep_output = layers.Dense(
+    number_of_classes,
+    activation="softmax",
+    name="sentiment_output"
+)(deep_features)
+
+deep_model = tf.keras.Model(
+    inputs=deep_input,
+    outputs=deep_output,
+    name="irbis_text_neural_model"
+)
+
+
+# Компилируем нейронную сеть.
+# Функция потерь sparse_categorical_crossentropy подходит для многоклассовой
+# классификации, когда классы заданы целыми числами.
+# Adam — метод настройки весов нейронной сети во время обучения.
+
+deep_model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+    loss="sparse_categorical_crossentropy",
+    metrics=["accuracy"]
+)
+
+
+# Ранняя остановка прекращает обучение, когда качество на проверочной части
+# перестает улучшаться. Лучшие веса возвращаются в модель.
+
+early_stopping = EarlyStopping(
+    monitor="val_loss",
+    patience=3,
+    restore_best_weights=True
+)
+
+# Обучаем нейронную сеть.
+# Количество эпох ограничено, чтобы эксперимент укладывался в стандартные
+# лимиты среды Google Colab и не перегружал вычисления.
+
+start_time = time.time()
+
+deep_history = deep_model.fit(
+    np.array(X_train),
+    y_train_encoded,
+    validation_data=(
+        np.array(X_valid),
+        y_valid_encoded
+    ),
+    epochs=15,
+    batch_size=32,
+    callbacks=[early_stopping],
+    verbose=1
+)
+
+deep_train_seconds = round(time.time() - start_time, 4)
+
+
+# Получаем ответы нейронной сети на проверочной части.
+# Модель возвращает вероятности классов, затем выбирается класс с наибольшей вероятностью.
+
+deep_valid_probabilities = deep_model.predict(
+    np.array(X_valid),
+    verbose=0
+)
+
+deep_valid_encoded_pred = np.argmax(
+    deep_valid_probabilities,
+    axis=1
+)
+
+deep_valid_pred = label_encoder.inverse_transform(
+    deep_valid_encoded_pred
+)
+
+
+# Добавляем качество нейронной сети в общую таблицу сравнения.
+
+model_metrics.append(
+    calculate_metrics(
+        model_name="Нейронная сеть LSTM",
+        model_type="Глубокое обучение",
+        y_true=y_valid,
+        y_pred=deep_valid_pred,
+        train_seconds=deep_train_seconds
+    )
+)
+
+class_reports.append(
+    make_classification_report_table(
+        model_name="Нейронная сеть LSTM",
+        y_true=y_valid,
+        y_pred=deep_valid_pred
+    )
+)
+
+# Собираем итоговую таблицу сравнения моделей.
+# Таблица сортируется по средней F-мере, поскольку показатель учитывает
+# точность и полноту по всем классам тональности.
+
+model_comparison_df = pd.DataFrame(model_metrics)
+
+metric_columns = [
+    "Доля правильных ответов",
+    "Точность средняя",
+    "Полнота средняя",
+    "F-мера средняя",
+    "Время обучения, секунд",
+]
+
+for column_name in metric_columns:
+    model_comparison_df[column_name] = model_comparison_df[column_name].round(4)
+
+model_comparison_df = model_comparison_df.sort_values(
+    by="F-мера средняя",
+    ascending=False
+).reset_index(drop=True)
+
+
+# Сохраняем таблицу сравнения для отчета.
+# Файл относится к отчетным материалам и не требуется пользовательскому приложению.
+
+model_comparison_path = reports_dir / "stage6_model_comparison.csv"
+
+model_comparison_df.to_csv(
+    model_comparison_path,
+    index=False,
+    encoding="utf-8-sig"
+)
+
+model_comparison_df
+
+# Формируем подробную таблицу качества по каждому классу тональности.
+# Таблица помогает увидеть, какие классы распознаются лучше или хуже.
+
+class_report_df = pd.concat(
+    class_reports,
+    axis=0
+).reset_index(drop=True)
+
+numeric_report_columns = [
+    "Точность",
+    "Полнота",
+    "F-мера",
+]
+
+for column_name in numeric_report_columns:
+    class_report_df[column_name] = class_report_df[column_name].round(4)
+
+
+# Сохраняем отчет по классам для последующего описания в работе.
+
+class_report_path = reports_dir / "stage6_classification_report_by_class.csv"
+
+class_report_df.to_csv(
+    class_report_path,
+    index=False,
+    encoding="utf-8-sig"
+)
+
+class_report_df
+
+# Строим график сравнения моделей по средней F-мере.
+# F-мера выбрана для визуализации, потому что учитывает ошибки
+# с разной стороны: ложные срабатывания и пропуски класса.
+
+plt.figure(figsize=(10, 5))
+
+plt.bar(
+    model_comparison_df["Модель"],
+    model_comparison_df["F-мера средняя"]
+)
+
+plt.title("Сравнение моделей по средней F-мере")
+plt.xlabel("Модель")
+plt.ylabel("Средняя F-мера")
+plt.ylim(0, 1)
+plt.xticks(rotation=35, ha="right")
+plt.tight_layout()
+
+comparison_plot_path = reports_dir / "stage6_model_comparison_f1.png"
+
+plt.savefig(
+    comparison_plot_path,
+    dpi=200,
+    bbox_inches="tight"
+)
+
+plt.show()
+
+# Определяем лучшую модель по средней F-мере на проверочной части.
+# Если лучшей оказалась классическая модель, ответы берутся из сохраненной
+# в памяти цепочки обработки текста и классификатора.
+# Если лучшей оказалась нейронная сеть, ответы берутся из deep_model.
+
+best_model_candidate_name = model_comparison_df.loc[
+    0,
+    "Модель"
+]
+
+if best_model_candidate_name == "Нейронная сеть LSTM":
+    best_valid_pred = deep_valid_pred
+else:
+    best_model_candidate = trained_classical_models[best_model_candidate_name]
+    best_valid_pred = best_model_candidate.predict(X_valid)
+
+
+# Строим матрицу ошибок для лучшей модели на проверочной части.
+# Строки соответствуют настоящим классам, столбцы соответствуют ответам модели.
+
+best_confusion_matrix = confusion_matrix(
+    y_valid,
+    best_valid_pred,
+    labels=class_names
+)
+
+plt.figure(figsize=(6, 5))
+
+ConfusionMatrixDisplay(
+    confusion_matrix=best_confusion_matrix,
+    display_labels=class_names
+).plot(
+    values_format="d"
+)
+
+plt.title("Матрица ошибок лучшей модели на проверочной части")
+plt.tight_layout()
+
+confusion_matrix_path = reports_dir / "stage6_best_model_confusion_matrix.png"
+
+plt.savefig(
+    confusion_matrix_path,
+    dpi=200,
+    bbox_inches="tight"
+)
+
+plt.show()
+
+# Строим графики обучения нейронной сети.
+# Первый график показывает изменение ошибки на обучающей и проверочной частях.
+# Второй график показывает изменение доли правильных ответов.
+
+history_df = pd.DataFrame(deep_history.history)
+
+history_path = reports_dir / "stage6_deep_learning_history.csv"
+
+history_df.to_csv(
+    history_path,
+    index=False,
+    encoding="utf-8-sig"
+)
+
+
+plt.figure(figsize=(8, 5))
+
+plt.plot(
+    history_df.index + 1,
+    history_df["loss"],
+    marker="o",
+    label="Обучающая часть"
+)
+
+plt.plot(
+    history_df.index + 1,
+    history_df["val_loss"],
+    marker="o",
+    label="Проверочная часть"
+)
+
+plt.title("Изменение ошибки нейронной сети")
+plt.xlabel("Эпоха обучения")
+plt.ylabel("Ошибка")
+plt.legend()
+plt.tight_layout()
+
+deep_loss_plot_path = reports_dir / "stage6_deep_learning_loss.png"
+
+plt.savefig(
+    deep_loss_plot_path,
+    dpi=200,
+    bbox_inches="tight"
+)
+
+plt.show()
+
+
+plt.figure(figsize=(8, 5))
+
+plt.plot(
+    history_df.index + 1,
+    history_df["accuracy"],
+    marker="o",
+    label="Обучающая часть"
+)
+
+plt.plot(
+    history_df.index + 1,
+    history_df["val_accuracy"],
+    marker="o",
+    label="Проверочная часть"
+)
+
+plt.title("Изменение доли правильных ответов нейронной сети")
+plt.xlabel("Эпоха обучения")
+plt.ylabel("Доля правильных ответов")
+plt.ylim(0, 1)
+plt.legend()
+plt.tight_layout()
+
+deep_accuracy_plot_path = reports_dir / "stage6_deep_learning_accuracy.png"
+
+plt.savefig(
+    deep_accuracy_plot_path,
+    dpi=200,
+    bbox_inches="tight"
+)
+
+plt.show()
+
+# Создаем графическую схему нейронной сети.
+# Если средство построения схемы недоступно в текущей среде, создается
+# простая схема слоев средствами matplotlib.
+
+deep_architecture_path = reports_dir / "stage6_deep_model_architecture.png"
+
+try:
+    tf.keras.utils.plot_model(
+        deep_model,
+        to_file=str(deep_architecture_path),
+        show_shapes=True,
+        show_layer_names=True,
+        dpi=140
+    )
+except Exception:
+    layer_names = [
+        "Текст отзыва",
+        "Разделение текста на слова",
+        "Числовые представления слов",
+        "Двунаправленный слой LSTM",
+        "Объединение признаков последовательности",
+        "Скрытый решающий слой",
+        "Выходной слой тональности",
+    ]
+
+    plt.figure(figsize=(8, 9))
+
+    for index, layer_name in enumerate(layer_names):
+        y_position = len(layer_names) - index
+
+        plt.text(
+            0.5,
+            y_position,
+            layer_name,
+            ha="center",
+            va="center",
+            bbox=dict(
+                boxstyle="round,pad=0.4",
+                fill=False
+            )
+        )
+
+        if index < len(layer_names) - 1:
+            plt.annotate(
+                "",
+                xy=(0.5, y_position - 0.35),
+                xytext=(0.5, y_position - 0.75),
+                arrowprops=dict(arrowstyle="->")
+            )
+
+    plt.axis("off")
+    plt.title("Схема нейронной сети")
+    plt.tight_layout()
+
+    plt.savefig(
+        deep_architecture_path,
+        dpi=200,
+        bbox_inches="tight"
+    )
+
+    plt.close()
+
+
+# Отображаем схему нейронной сети в ноутбуке.
+
+from IPython.display import Image, display
+
+display(
+    Image(
+        filename=str(deep_architecture_path)
+    )
+)
+
+# Формируем служебную сводку этапа.
+# Пути к отчетным материалам понадобятся при описании эксперимента.
+
+stage6_artifacts = pd.DataFrame(
+    {
+        "Материал": [
+            "Таблица сравнения моделей",
+            "Таблица качества по классам",
+            "График сравнения моделей",
+            "Матрица ошибок лучшей модели",
+            "История обучения нейронной сети",
+            "График ошибки нейронной сети",
+            "График доли правильных ответов нейронной сети",
+            "Схема нейронной сети",
+            "Лучший кандидат по проверочной части",
+        ],
+        "Значение": [
+            str(model_comparison_path),
+            str(class_report_path),
+            str(comparison_plot_path),
+            str(confusion_matrix_path),
+            str(history_path),
+            str(deep_loss_plot_path),
+            str(deep_accuracy_plot_path),
+            str(deep_architecture_path),
+            best_model_candidate_name,
+        ],
+    }
+)
+
+stage6_artifacts
