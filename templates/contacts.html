@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Контакты{% endblock %}
+{% block content %}
+<section class="container section narrow">
+    <h1>Контакты</h1>
+    <p>Санкт-Петербург. Демонстрационная форма связи для учебного проекта.</p>
+    <form method="post" class="form-card">
+        <label>Имя<input name="name" required></label>
+        <label>Почта<input name="email" type="email" required></label>
+        <label>Сообщение<textarea name="message" rows="5" required></textarea></label>
+        <button class="button" type="submit">Отправить</button>
+    </form>
+</section>
+{% endblock %}

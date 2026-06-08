@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Новая заявка{% endblock %}
+{% block content %}
+<section class="container section narrow">
+    <h1>Новая заявка</h1>
+    <form method="post" class="form-card">
+        <label>Название заявки<input name="title" required></label>
+        <label>Услуга<select name="service_id" required>{% for service in services %}<option value="{{ service.id }}">{{ service.title }}</option>{% endfor %}</select></label>
+        <label>Адрес объекта<input name="object_address"></label>
+        <label>Приоритет<select name="priority"><option value="low">Низкий</option><option value="medium" selected>Средний</option><option value="high">Высокий</option><option value="urgent">Срочный</option></select></label>
+        <label>Описание<textarea name="description" rows="7" required></textarea></label>
+        <button class="button" type="submit">Создать заявку</button>
+    </form>
+</section>
+{% endblock %}

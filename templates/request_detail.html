@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Заявка #{{ request_item.id }}{% endblock %}
+{% block content %}
+<section class="container section">
+    <nav class="breadcrumbs"><a href="{{ url_for('client.dashboard') }}">Кабинет</a> / Заявка #{{ request_item.id }}</nav>
+    <div class="detail-grid">
+        <article class="panel">
+            <h1>{{ request_item.title }}</h1>
+            <p class="lead">{{ request_item.description }}</p>
+            <dl class="meta-list">
+                <dt>Услуга</dt><dd>{{ request_item.service.title }}</dd>
+                <dt>Статус</dt><dd>{{ request_item.status_label() }}</dd>
+                <dt>Приоритет</dt><dd>{{ request_item.priority_label() }}</dd>
+                <dt>Адрес объекта</dt><dd>{{ request_item.object_address or 'Не указан' }}</dd>
+            </dl>
+            {% if current_user.role == 'client' %}<a class="button" href="{{ url_for('client.create_feedback', request_id=request_item.id) }}">Оставить отзыв</a>{% endif %}
+        </article>
+        <aside class="panel">
+            <h2>Отзывы</h2>
+            {% for feedback in request_item.feedback_items %}
+                <div class="feedback {{ feedback.sentiment }}"><strong>{{ feedback.sentiment_label() }}</strong><span>{{ feedback.aspect }}</span><p>{{ feedback.text }}</p></div>
+            {% else %}<p>Отзывов пока нет.</p>{% endfor %}
+        </aside>
+    </div>
+    <section class="panel">
+        <h2>Комментарии</h2>
+        {% for comment in request_item.comments %}
+            <div class="comment"><strong>{{ comment.author.full_name }}</strong><time>{{ comment.created_at.strftime('%d.%m.%Y %H:%M') }}</time><p>{{ comment.body }}</p></div>
+        {% else %}<p>Комментариев пока нет.</p>{% endfor %}
+        <form method="post" class="comment-form">
+            <textarea name="body" rows="4" placeholder="Введите комментарий" required></textarea>
+            <button class="button" type="submit">Добавить комментарий</button>
+        </form>
+    </section>
+</section>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Отзыв{% endblock %}
+{% block content %}
+<section class="container section narrow">
+    <h1>Отзыв по заявке #{{ request_item.id }}</h1>
+    <form method="post" class="form-card">
+        <label>Текст отзыва<textarea name="text" rows="8" required placeholder="Опишите качество взаимодействия, сроки, документы или работу специалиста"></textarea></label>
+        <button class="button" type="submit">Сохранить и проанализировать</button>
+    </form>
+</section>
+{% endblock %}

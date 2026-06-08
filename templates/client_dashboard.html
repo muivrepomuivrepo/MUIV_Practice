@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Кабинет клиента{% endblock %}
+{% block content %}
+<section class="container section">
+    <div class="page-header">
+        <div><h1>Кабинет клиента</h1><p class="lead">Заявки и история взаимодействия с компанией.</p></div>
+        <a class="button" href="{{ url_for('client.create_request_view') }}">Новая заявка</a>
+    </div>
+    <div class="table-card">
+        <table>
+            <thead><tr><th>Номер</th><th>Название</th><th>Услуга</th><th>Статус</th><th>Дата</th></tr></thead>
+            <tbody>
+            {% for item in requests %}
+            <tr>
+                <td>#{{ item.id }}</td>
+                <td><a href="{{ url_for('client.request_detail', request_id=item.id) }}">{{ item.title }}</a></td>
+                <td>{{ item.service.title }}</td>
+                <td><span class="status">{{ item.status_label() }}</span></td>
+                <td>{{ item.created_at.strftime('%d.%m.%Y') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">Заявок пока нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Главная — IRBIS Client Service{% endblock %}
+{% block content %}
+<section class="hero">
+    <div class="container hero-grid">
+        <div>
+            <p class="eyebrow">Веб-технологии для строительного инжиниринга</p>
+            <h1>Автоматизация клиентских обращений и анализа обратной связи</h1>
+            <p>Сервис объединяет заявки, комментарии, статусы, отзывы и интеллектуальный анализ тональности сообщений клиентов.</p>
+            <div class="hero-actions">
+                <a class="button" href="{{ url_for('auth.register') }}">Создать обращение</a>
+                <a class="button secondary" href="{{ url_for('public.services') }}">Посмотреть услуги</a>
+            </div>
+        </div>
+        <div class="hero-card">
+            <h3>Процесс обработки</h3>
+            <ol>
+                <li>Клиент создает заявку.</li>
+                <li>Менеджер назначает ответственного.</li>
+                <li>Система анализирует отзыв.</li>
+                <li>Руководитель получает сводные отчеты.</li>
+            </ol>
+        </div>
+    </div>
+</section>
+<section class="container section">
+    <h2>Ключевые услуги</h2>
+    <div class="cards-grid">
+        {% for service in services %}
+        <article class="card">
+            <h3>{{ service.title }}</h3>
+            <p>{{ service.short_description }}</p>
+            <a href="{{ url_for('public.service_detail', slug=service.slug) }}">Подробнее</a>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

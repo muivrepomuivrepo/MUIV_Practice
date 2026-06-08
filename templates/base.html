@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}IRBIS Client Service{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/adaptive.css') }}">
+</head>
+<body>
+<header class="site-header">
+    <div class="container header-inner">
+        <a class="brand" href="{{ url_for('public.index') }}">IRBIS Client Service</a>
+        <nav class="main-nav">
+            <a href="{{ url_for('public.services') }}">Услуги</a>
+            <a href="{{ url_for('public.projects') }}">Проекты</a>
+            <a href="{{ url_for('public.about') }}">О компании</a>
+            <a href="{{ url_for('public.contacts') }}">Контакты</a>
+            <a href="{{ url_for('public.faq') }}">FAQ</a>
+            {% if current_user.is_authenticated %}
+                {% if current_user.role == 'admin' %}<a href="{{ url_for('admin.dashboard') }}">Администрирование</a>{% endif %}
+                {% if current_user.role == 'manager' %}<a href="{{ url_for('manager.dashboard') }}">Менеджер</a>{% endif %}
+                {% if current_user.role == 'client' %}<a href="{{ url_for('client.dashboard') }}">Кабинет</a>{% endif %}
+                <a href="{{ url_for('auth.logout') }}">Выход</a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}">Вход</a>
+                <a class="nav-button" href="{{ url_for('auth.register') }}">Регистрация</a>
+            {% endif %}
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container flash-area">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+    <div class="container footer-grid">
+        <div>
+            <strong>ООО «ГК «ИРБИС»»</strong>
+            <p>Демонстрационный веб-сервис для автоматизации клиентских обращений.</p>
+        </div>
+        <div>
+            <a href="{{ url_for('public.privacy') }}">Политика обработки данных</a>
+        </div>
+    </div>
+</footer>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

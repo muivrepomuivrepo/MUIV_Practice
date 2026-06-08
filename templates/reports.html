@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Отчеты{% endblock %}
+{% block content %}
+<section class="container section">
+    <h1>Отчеты</h1>
+    <div class="report-grid">
+        <div class="panel"><h2>Статусы заявок</h2><ul>{% for key, value in status_stats.items() %}<li>{{ key }} — {{ value }}</li>{% endfor %}</ul></div>
+        <div class="panel"><h2>Тональность отзывов</h2><ul>{% for key, value in sentiment_stats.items() %}<li>{{ key }} — {{ value }}</li>{% endfor %}</ul></div>
+        <div class="panel"><h2>Аспекты обращений</h2><ul>{% for key, value in aspect_stats.items() %}<li>{{ key }} — {{ value }}</li>{% endfor %}</ul></div>
+        <div class="panel"><h2>Услуги</h2><ul>{% for title, count in service_stats %}<li>{{ title }} — {{ count }}</li>{% endfor %}</ul></div>
+    </div>
+</section>
+{% endblock %}

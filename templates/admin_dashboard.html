@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Администрирование{% endblock %}
+{% block content %}
+<section class="container section">
+    <h1>Административная панель</h1>
+    <div class="stats-grid">
+        <div class="stat-card"><strong>{{ users_count }}</strong><span>Пользователи</span></div>
+        <div class="stat-card"><strong>{{ services_count }}</strong><span>Услуги</span></div>
+        <div class="stat-card"><strong>{{ 'Да' if model_status.available else 'Нет' }}</strong><span>Модель подключена</span></div>
+    </div>
+    <div class="actions-row"><a class="button" href="{{ url_for('admin.users') }}">Пользователи</a><a class="button secondary" href="{{ url_for('admin.services') }}">Услуги</a><a class="button secondary" href="{{ url_for('admin.model_status') }}">Состояние модели</a></div>
+</section>
+{% endblock %}
