@@ -1716,3 +1716,895 @@ stage6_artifacts = pd.DataFrame(
 )
 
 stage6_artifacts
+
+
+"""Лучший результат на проверочной части показал линейный метод опорных векторов, для которого средняя F-мера составила 0,7674, доля правильных ответов — 0,7638. Наивный байесовский классификатор и логистическая регрессия дали близкое качество, что подтверждает устойчивость признакового подхода на основе частот слов. Случайный лес уступил линейным моделям, а нейронная сеть показала признаки переобучения – ошибка на обучающей части снижалась, проверочная ошибка после третьей эпохи начала расти.
+
+Матрица ошибок лучшей модели указывает на основную трудность эксперимента из-за того, что отрицательные и нейтральные отзывы частично смешиваются между собой. Положительный класс распознается лучше, поскольку в текстах с высокой оценкой чаще встречаются явно выраженные слова благодарности и одобрения. Для улучшения итогового варианта логично подобрать параметры лучшей линейной модели. LinearSVC подходит для разреженных признаков, которые формирует частотное представление текста, а многоклассовая классификация в этом методе строится по схеме «один класс против остальных». Подбор параметров выполняется через GridSearchCV, который перебирает заданные сочетания параметров и выбирает лучший вариант по проверке на нескольких разбиениях обучающей части.
+
+# 7. Подбор параметров и итоговая проверка лучшей модели
+
+На предыдущем этапе лучшим кандидатом стал линейный метод опорных векторов. Для повышения качества подбираются параметры преобразования текста и параметр строгости разделяющей границы модели. Проверка выполняется на нескольких разбиениях обучающей части, а контрольная часть остается закрытой до итоговой оценки.
+
+После подбора параметров модель проверяется на контрольной части, которая ранее не участвовала в обучении и выборе настроек. По результатам строятся таблицы качества, матрица ошибок, график сравнения базовой и улучшенной модели, таблица наиболее значимых текстовых признаков и схема итоговой цепочки обработки текста.
+"""
+
+# Подключаем средства для подбора параметров и итоговой оценки.
+# GridSearchCV перебирает заданные сочетания параметров модели.
+# classification_report рассчитывает качество отдельно по каждому классу.
+# confusion_matrix строит таблицу совпадений настоящих и предсказанных классов.
+
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import time
+
+
+# Объединяем обучающую и проверочную части.
+# На предыдущем этапе проверочная часть помогла выбрать семейство модели.
+# Теперь обе части можно использовать для подбора параметров внутри обучающего материала.
+# Контрольная часть X_test и y_test остается отдельной для итоговой проверки.
+
+X_tuning = pd.concat(
+    [
+        X_train.reset_index(drop=True),
+        X_valid.reset_index(drop=True)
+    ],
+    axis=0
+).reset_index(drop=True)
+
+y_tuning = pd.concat(
+    [
+        y_train.reset_index(drop=True),
+        y_valid.reset_index(drop=True)
+    ],
+    axis=0
+).reset_index(drop=True)
+
+
+# Формируем сводку по данным для подбора параметров и итоговой проверки.
+
+stage7_split_overview = pd.DataFrame(
+    {
+        "Часть данных": [
+            "Материал для подбора параметров",
+            "Контрольная часть для итоговой проверки",
+        ],
+        "Количество отзывов": [
+            len(X_tuning),
+            len(X_test),
+        ],
+    }
+)
+
+stage7_split_overview
+
+# Проверяем распределение классов после объединения обучающей и проверочной частей.
+# Равномерность распределения нужна для устойчивого подбора параметров.
+
+stage7_class_distribution = pd.concat(
+    [
+        y_tuning.value_counts().sort_index().rename("Материал для подбора параметров"),
+        y_test.value_counts().sort_index().rename("Контрольная часть"),
+    ],
+    axis=1
+).fillna(0).astype(int)
+
+stage7_class_distribution
+
+# Создаем базовый вариант лучшей модели.
+# Базовый вариант повторяет настройки линейного метода опорных векторов
+# с предыдущего этапа и нужен для честного сравнения с улучшенным вариантом.
+
+baseline_pipeline = Pipeline(
+    steps=[
+        (
+            "text_features",
+            TfidfVectorizer(
+                max_features=8000,
+                ngram_range=(1, 2),
+                min_df=2,
+                sublinear_tf=True
+            )
+        ),
+        (
+            "classifier",
+            LinearSVC(
+                class_weight="balanced",
+                random_state=RANDOM_STATE,
+                max_iter=6000
+            )
+        ),
+    ]
+)
+
+
+# Обучаем базовый вариант на материале для подбора параметров.
+# Контрольная часть в обучении не участвует.
+
+baseline_start_time = time.time()
+
+baseline_pipeline.fit(
+    X_tuning,
+    y_tuning
+)
+
+baseline_train_seconds = round(
+    time.time() - baseline_start_time,
+    4
+)
+
+
+# Получаем ответы базового варианта на контрольной части.
+
+baseline_test_pred = baseline_pipeline.predict(
+    X_test
+)
+
+# Создаем цепочку для подбора параметров.
+# В цепочку входят преобразование текста и линейный классификатор.
+# Классификатор — модель, которая относит отзыв к одному из классов тональности.
+
+search_pipeline = Pipeline(
+    steps=[
+        (
+            "text_features",
+            TfidfVectorizer()
+        ),
+        (
+            "classifier",
+            LinearSVC(
+                class_weight="balanced",
+                random_state=RANDOM_STATE,
+                max_iter=8000
+            )
+        ),
+    ]
+)
+
+
+# Задаем набор параметров для перебора.
+# max_features ограничивает число текстовых признаков.
+# ngram_range задает учет отдельных слов или отдельных слов вместе с парами соседних слов.
+# min_df убирает слишком редкие слова.
+# sublinear_tf сглаживает влияние очень частых слов.
+# C управляет строгостью разделения классов: меньшие значения сильнее ограничивают модель,
+# большие значения дают модели больше свободы при разделении классов.
+
+parameter_grid = {
+    "text_features__max_features": [5000, 8000, 12000],
+    "text_features__ngram_range": [(1, 1), (1, 2)],
+    "text_features__min_df": [1, 2, 3],
+    "text_features__sublinear_tf": [True],
+    "classifier__C": [0.3, 0.7, 1.0, 1.5, 2.5],
+}
+
+
+# Создаем средство подбора параметров.
+# cv=3 означает проверку каждого сочетания параметров на трех разбиениях.
+# scoring="f1_macro" выбирает среднюю F-меру по классам как главный показатель.
+# n_jobs=-1 задействует доступные вычислительные ядра.
+
+parameter_search = GridSearchCV(
+    estimator=search_pipeline,
+    param_grid=parameter_grid,
+    scoring="f1_macro",
+    cv=3,
+    n_jobs=-1,
+    refit=True,
+    verbose=1
+)
+
+
+# Запускаем подбор параметров на объединенной обучающей части.
+
+search_start_time = time.time()
+
+parameter_search.fit(
+    X_tuning,
+    y_tuning
+)
+
+search_train_seconds = round(
+    time.time() - search_start_time,
+    4
+)
+
+
+# Получаем улучшенную модель с лучшими найденными параметрами.
+
+tuned_pipeline = parameter_search.best_estimator_
+
+# Применяем улучшенную модель к контрольной части.
+# Контрольная часть не участвовала в обучении и подборе параметров.
+
+tuned_test_pred = tuned_pipeline.predict(
+    X_test
+)
+
+
+# Создаем функцию для расчета итоговых показателей качества.
+# Доля правильных ответов показывает общий процент верных ответов.
+# Точность средняя, полнота средняя и F-мера средняя рассчитываются как средние значения по классам.
+
+def evaluate_final_model(model_name, y_true, y_pred, train_seconds):
+    return {
+        "Модель": model_name,
+        "Доля правильных ответов": accuracy_score(
+            y_true,
+            y_pred
+        ),
+        "Точность средняя": precision_score(
+            y_true,
+            y_pred,
+            average="macro",
+            zero_division=0
+        ),
+        "Полнота средняя": recall_score(
+            y_true,
+            y_pred,
+            average="macro",
+            zero_division=0
+        ),
+        "F-мера средняя": f1_score(
+            y_true,
+            y_pred,
+            average="macro",
+            zero_division=0
+        ),
+        "Время обучения и подбора, секунд": train_seconds,
+    }
+
+
+# Формируем таблицу сравнения базовой и улучшенной модели.
+
+final_test_comparison_df = pd.DataFrame(
+    [
+        evaluate_final_model(
+            model_name="Линейный метод опорных векторов до подбора параметров",
+            y_true=y_test,
+            y_pred=baseline_test_pred,
+            train_seconds=baseline_train_seconds
+        ),
+        evaluate_final_model(
+            model_name="Линейный метод опорных векторов после подбора параметров",
+            y_true=y_test,
+            y_pred=tuned_test_pred,
+            train_seconds=search_train_seconds
+        ),
+    ]
+)
+
+quality_columns = [
+    "Доля правильных ответов",
+    "Точность средняя",
+    "Полнота средняя",
+    "F-мера средняя",
+    "Время обучения и подбора, секунд",
+]
+
+for column_name in quality_columns:
+    final_test_comparison_df[column_name] = final_test_comparison_df[column_name].round(4)
+
+
+# Сохраняем таблицу для отчета.
+
+stage7_final_comparison_path = reports_dir / "stage7_final_test_comparison.csv"
+
+final_test_comparison_df.to_csv(
+    stage7_final_comparison_path,
+    index=False,
+    encoding="utf-8-sig"
+)
+
+final_test_comparison_df
+
+# Показываем лучшие найденные параметры.
+# Таблица понадобится для описания улучшенного варианта модели.
+
+best_parameters_df = pd.DataFrame(
+    {
+        "Параметр": list(parameter_search.best_params_.keys()),
+        "Значение": [str(value) for value in parameter_search.best_params_.values()],
+    }
+)
+
+best_parameters_df = pd.concat(
+    [
+        pd.DataFrame(
+            {
+                "Параметр": ["Лучшее среднее значение F-меры при подборе"],
+                "Значение": [round(parameter_search.best_score_, 4)],
+            }
+        ),
+        best_parameters_df
+    ],
+    axis=0
+).reset_index(drop=True)
+
+
+# Сохраняем параметры для отчетной части.
+
+stage7_best_parameters_path = reports_dir / "stage7_best_parameters.csv"
+
+best_parameters_df.to_csv(
+    stage7_best_parameters_path,
+    index=False,
+    encoding="utf-8-sig"
+)
+
+best_parameters_df
+
+# Формируем подробный отчет по классам для улучшенной модели.
+# Отчет показывает качество распознавания отрицательных, нейтральных
+# и положительных отзывов на контрольной части.
+
+final_report_dict = classification_report(
+    y_test,
+    tuned_test_pred,
+    labels=class_names,
+    target_names=class_names,
+    output_dict=True,
+    zero_division=0
+)
+
+final_class_report_rows = []
+
+for class_name in class_names:
+    final_class_report_rows.append(
+        {
+            "Класс тональности": class_name,
+            "Точность": final_report_dict[class_name]["precision"],
+            "Полнота": final_report_dict[class_name]["recall"],
+            "F-мера": final_report_dict[class_name]["f1-score"],
+            "Количество отзывов": final_report_dict[class_name]["support"],
+        }
+    )
+
+final_class_report_df = pd.DataFrame(
+    final_class_report_rows
+)
+
+for column_name in ["Точность", "Полнота", "F-мера"]:
+    final_class_report_df[column_name] = final_class_report_df[column_name].round(4)
+
+
+# Сохраняем отчет по классам.
+
+stage7_final_class_report_path = reports_dir / "stage7_final_class_report.csv"
+
+final_class_report_df.to_csv(
+    stage7_final_class_report_path,
+    index=False,
+    encoding="utf-8-sig"
+)
+
+final_class_report_df
+
+# Строим график сравнения базовой и улучшенной модели.
+# На графике сопоставляются четыре показателя качества на контрольной части.
+
+plot_metrics = [
+    "Доля правильных ответов",
+    "Точность средняя",
+    "Полнота средняя",
+    "F-мера средняя",
+]
+
+plot_df = final_test_comparison_df[
+    ["Модель"] + plot_metrics
+].copy()
+
+plot_df["Модель"] = plot_df["Модель"].replace(
+    {
+        "Линейный метод опорных векторов до подбора параметров": "До подбора",
+        "Линейный метод опорных векторов после подбора параметров": "После подбора",
+    }
+)
+
+x_positions = np.arange(
+    len(plot_metrics)
+)
+
+bar_width = 0.35
+
+plt.figure(figsize=(10, 5))
+
+for model_index, model_name in enumerate(plot_df["Модель"]):
+    values = plot_df.loc[
+        plot_df["Модель"] == model_name,
+        plot_metrics
+    ].values.flatten()
+
+    plt.bar(
+        x_positions + model_index * bar_width,
+        values,
+        width=bar_width,
+        label=model_name
+    )
+
+plt.title("Сравнение качества до и после подбора параметров")
+plt.xlabel("Показатель качества")
+plt.ylabel("Значение")
+plt.ylim(0, 1)
+plt.xticks(
+    x_positions + bar_width / 2,
+    plot_metrics,
+    rotation=20,
+    ha="right"
+)
+plt.legend()
+plt.tight_layout()
+
+stage7_metrics_plot_path = reports_dir / "stage7_metrics_before_after.png"
+
+plt.savefig(
+    stage7_metrics_plot_path,
+    dpi=200,
+    bbox_inches="tight"
+)
+
+plt.show()
+
+# Строим матрицу ошибок улучшенной модели на контрольной части.
+# Строки соответствуют настоящим классам, столбцы соответствуют ответам модели.
+
+final_confusion_matrix = confusion_matrix(
+    y_test,
+    tuned_test_pred,
+    labels=class_names
+)
+
+plt.figure(figsize=(6, 5))
+
+ConfusionMatrixDisplay(
+    confusion_matrix=final_confusion_matrix,
+    display_labels=class_names
+).plot(
+    values_format="d"
+)
+
+plt.title("Матрица ошибок улучшенной модели на контрольной части")
+plt.tight_layout()
+
+stage7_confusion_matrix_path = reports_dir / "stage7_final_confusion_matrix.png"
+
+plt.savefig(
+    stage7_confusion_matrix_path,
+    dpi=200,
+    bbox_inches="tight"
+)
+
+plt.show()
+
+# Строим график качества улучшенной модели по классам.
+# График помогает увидеть, какой класс распознается устойчивее,
+# а какой требует большего числа обучающих примеров.
+
+class_metric_names = [
+    "Точность",
+    "Полнота",
+    "F-мера",
+]
+
+x_positions = np.arange(
+    len(final_class_report_df["Класс тональности"])
+)
+
+bar_width = 0.25
+
+plt.figure(figsize=(9, 5))
+
+for metric_index, metric_name in enumerate(class_metric_names):
+    plt.bar(
+        x_positions + metric_index * bar_width,
+        final_class_report_df[metric_name],
+        width=bar_width,
+        label=metric_name
+    )
+
+plt.title("Качество улучшенной модели по классам")
+plt.xlabel("Класс тональности")
+plt.ylabel("Значение")
+plt.ylim(0, 1)
+plt.xticks(
+    x_positions + bar_width,
+    final_class_report_df["Класс тональности"]
+)
+plt.legend()
+plt.tight_layout()
+
+stage7_class_metrics_plot_path = reports_dir / "stage7_class_metrics.png"
+
+plt.savefig(
+    stage7_class_metrics_plot_path,
+    dpi=200,
+    bbox_inches="tight"
+)
+
+plt.show()
+
+# Извлекаем наиболее значимые текстовые признаки улучшенной модели.
+# Для линейной модели коэффициенты показывают, какие слова и выражения
+# сильнее связаны с каждым классом тональности.
+
+final_vectorizer = tuned_pipeline.named_steps["text_features"]
+final_classifier = tuned_pipeline.named_steps["classifier"]
+
+feature_names = final_vectorizer.get_feature_names_out()
+classifier_classes = final_classifier.classes_
+
+top_features_rows = []
+
+top_feature_count = 15
+
+for class_index, class_name in enumerate(classifier_classes):
+    class_coefficients = final_classifier.coef_[class_index]
+
+    top_indexes = np.argsort(
+        class_coefficients
+    )[-top_feature_count:][::-1]
+
+    for rank_index, feature_index in enumerate(top_indexes, start=1):
+        top_features_rows.append(
+            {
+                "Класс тональности": class_name,
+                "Место": rank_index,
+                "Текстовый признак": feature_names[feature_index],
+                "Коэффициент": class_coefficients[feature_index],
+            }
+        )
+
+top_features_df = pd.DataFrame(
+    top_features_rows
+)
+
+top_features_df["Коэффициент"] = top_features_df["Коэффициент"].round(4)
+
+
+# Сохраняем таблицу значимых признаков.
+
+stage7_top_features_path = reports_dir / "stage7_top_text_features.csv"
+
+top_features_df.to_csv(
+    stage7_top_features_path,
+    index=False,
+    encoding="utf-8-sig"
+)
+
+top_features_df
+
+# Строим графики наиболее значимых признаков по каждому классу.
+# Каждый рисунок показывает слова и короткие выражения,
+# которые сильнее всего связаны с выбранным классом тональности.
+
+top_feature_plot_paths = []
+
+for class_name in classifier_classes:
+    class_features = top_features_df[
+        top_features_df["Класс тональности"] == class_name
+    ].sort_values(
+        by="Коэффициент",
+        ascending=True
+    )
+
+    plt.figure(figsize=(8, 5))
+
+    plt.barh(
+        class_features["Текстовый признак"],
+        class_features["Коэффициент"]
+    )
+
+    plt.title(f"Наиболее значимые признаки класса {class_name}")
+    plt.xlabel("Коэффициент")
+    plt.ylabel("Текстовый признак")
+    plt.tight_layout()
+
+    feature_plot_path = reports_dir / f"stage7_top_features_{class_name}.png"
+
+    plt.savefig(
+        feature_plot_path,
+        dpi=200,
+        bbox_inches="tight"
+    )
+
+    top_feature_plot_paths.append(
+        str(feature_plot_path)
+    )
+
+    plt.show()
+
+# Создаем аккуратную схему итоговой модели.
+# Схема показывает путь клиентского отзыва от ввода в веб-форму
+# до сохранения результата анализа в базе данных приложения.
+
+from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+import textwrap
+
+
+# Задаем путь для сохранения рисунка.
+# Новый файл заменит предыдущий вариант схемы.
+
+model_scheme_path = reports_dir / "stage7_final_model_scheme.png"
+
+
+# Создаем рисунок с горизонтальной ориентацией.
+# Размер подобран так, чтобы подписи не накладывались друг на друга.
+
+fig, ax = plt.subplots(figsize=(16, 6))
+
+
+# Отключаем координатные оси, поскольку строится схема процесса.
+
+ax.set_axis_off()
+ax.set_xlim(0, 1)
+ax.set_ylim(0, 1)
+
+
+# Задаем функцию переноса длинного текста.
+# Перенос ограничивает ширину подписи внутри блока.
+
+def wrap_text(text_value, width=24):
+    return "\n".join(
+        textwrap.wrap(
+            text_value,
+            width=width,
+            break_long_words=False
+        )
+    )
+
+
+# Описываем блоки схемы.
+# Каждый блок содержит короткое название операции и уточнение результата.
+
+scheme_blocks = {
+    "input": {
+        "title": "Текст отзыва",
+        "description": "сообщение из формы обратной связи",
+        "x": 0.05,
+        "y": 0.62,
+        "width": 0.16,
+        "height": 0.20,
+    },
+    "cleaning": {
+        "title": "Очистка текста",
+        "description": "удаление лишних пробелов и служебных символов",
+        "x": 0.29,
+        "y": 0.62,
+        "width": 0.16,
+        "height": 0.20,
+    },
+    "features": {
+        "title": "Частотные признаки",
+        "description": "числовое описание слов и словосочетаний",
+        "x": 0.53,
+        "y": 0.62,
+        "width": 0.16,
+        "height": 0.20,
+    },
+    "model": {
+        "title": "Линейная модель",
+        "description": "разделение отзывов по тональности",
+        "x": 0.77,
+        "y": 0.62,
+        "width": 0.16,
+        "height": 0.20,
+    },
+    "class": {
+        "title": "Класс тональности",
+        "description": "отрицательный, нейтральный или положительный",
+        "x": 0.53,
+        "y": 0.26,
+        "width": 0.16,
+        "height": 0.20,
+    },
+    "database": {
+        "title": "Результат в приложении",
+        "description": "запись результата в базу данных",
+        "x": 0.77,
+        "y": 0.26,
+        "width": 0.16,
+        "height": 0.20,
+    },
+}
+
+
+# Задаем оформление блоков.
+# Белый фон и черная рамка подходят для вставки рисунка в отчет.
+
+box_style = "round,pad=0.018,rounding_size=0.025"
+
+
+# Рисуем блоки схемы.
+
+for block in scheme_blocks.values():
+    block_patch = FancyBboxPatch(
+        (block["x"], block["y"]),
+        block["width"],
+        block["height"],
+        boxstyle=box_style,
+        linewidth=1.4,
+        edgecolor="black",
+        facecolor="white"
+    )
+
+    ax.add_patch(block_patch)
+
+    ax.text(
+        block["x"] + block["width"] / 2,
+        block["y"] + block["height"] * 0.66,
+        wrap_text(block["title"], width=22),
+        ha="center",
+        va="center",
+        fontsize=10,
+        fontweight="bold"
+    )
+
+    ax.text(
+        block["x"] + block["width"] / 2,
+        block["y"] + block["height"] * 0.34,
+        wrap_text(block["description"], width=26),
+        ha="center",
+        va="center",
+        fontsize=8.5
+    )
+
+
+# Создаем вспомогательные функции для расчета точек соединения.
+# Координаты берутся от границ блоков, поэтому стрелки не проходят через текст.
+
+def right_center(block):
+    return (
+        block["x"] + block["width"],
+        block["y"] + block["height"] / 2
+    )
+
+
+def left_center(block):
+    return (
+        block["x"],
+        block["y"] + block["height"] / 2
+    )
+
+
+def bottom_center(block):
+    return (
+        block["x"] + block["width"] / 2,
+        block["y"]
+    )
+
+
+def top_center(block):
+    return (
+        block["x"] + block["width"] / 2,
+        block["y"] + block["height"]
+    )
+
+
+# Создаем функцию добавления стрелки.
+# Стрелка показывает направление передачи результата между операциями.
+
+def add_arrow(start_point, end_point):
+    arrow_patch = FancyArrowPatch(
+        start_point,
+        end_point,
+        arrowstyle="-|>",
+        mutation_scale=16,
+        linewidth=1.3,
+        color="black",
+        shrinkA=8,
+        shrinkB=8
+    )
+
+    ax.add_patch(arrow_patch)
+
+
+# Добавляем стрелки верхнего ряда.
+
+add_arrow(
+    right_center(scheme_blocks["input"]),
+    left_center(scheme_blocks["cleaning"])
+)
+
+add_arrow(
+    right_center(scheme_blocks["cleaning"]),
+    left_center(scheme_blocks["features"])
+)
+
+add_arrow(
+    right_center(scheme_blocks["features"]),
+    left_center(scheme_blocks["model"])
+)
+
+
+# Добавляем переход от модели к классу тональности.
+# Стрелка идет вниз и не пересекает другие элементы схемы.
+
+add_arrow(
+    bottom_center(scheme_blocks["model"]),
+    top_center(scheme_blocks["class"])
+)
+
+
+# Добавляем переход от класса тональности к записи результата.
+
+add_arrow(
+    right_center(scheme_blocks["class"]),
+    left_center(scheme_blocks["database"])
+)
+
+
+# Добавляем заголовок рисунка.
+
+ax.text(
+    0.5,
+    0.93,
+    "Схема итоговой модели анализа тональности клиентских отзывов",
+    ha="center",
+    va="center",
+    fontsize=14,
+    fontweight="bold"
+)
+
+
+# Добавляем краткое пояснение под схемой.
+
+ax.text(
+    0.5,
+    0.10,
+    wrap_text(
+        "Модель применяется в веб-сервисе для автоматической обработки отзывов и выделения обращений, требующих внимания менеджера.",
+        width=110
+    ),
+    ha="center",
+    va="center",
+    fontsize=9.5
+)
+
+
+# Сохраняем рисунок с небольшими полями.
+# Параметр bbox_inches ограничивает файл областью содержимого.
+
+plt.savefig(
+    model_scheme_path,
+    dpi=220,
+    bbox_inches="tight",
+    pad_inches=0.20
+)
+
+plt.show()
+
+# Формируем перечень материалов, созданных на этапе подбора параметров.
+# Таблица помогает быстро проверить наличие отчетных файлов.
+
+stage7_artifacts = pd.DataFrame(
+    {
+        "Материал": [
+            "Сравнение базовой и улучшенной модели",
+            "Лучшие параметры",
+            "Отчет по классам на контрольной части",
+            "График качества до и после подбора",
+            "Матрица ошибок на контрольной части",
+            "График качества по классам",
+            "Таблица значимых текстовых признаков",
+            "Схема итоговой модели",
+            "Графики значимых признаков",
+        ],
+        "Значение": [
+            str(stage7_final_comparison_path),
+            str(stage7_best_parameters_path),
+            str(stage7_final_class_report_path),
+            str(stage7_metrics_plot_path),
+            str(stage7_confusion_matrix_path),
+            str(stage7_class_metrics_plot_path),
+            str(stage7_top_features_path),
+            str(model_scheme_path),
+            "; ".join(top_feature_plot_paths),
+        ],
+    }
+)
+
+stage7_artifacts
