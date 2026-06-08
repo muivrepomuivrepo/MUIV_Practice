@@ -2608,3 +2608,482 @@ stage7_artifacts = pd.DataFrame(
 )
 
 stage7_artifacts
+
+"""Подбор параметров дал умеренное улучшение: средняя F-мера на контрольной части выросла с 0,7058 до 0,7132, доля правильных ответов — с 0,7087 до 0,7165. Прирост небольшой, но устойчивый по всем основным метрикам, поэтому улучшенную модель можно выбрать как итоговую.
+
+Слабое место остается прежним: нейтральный класс распознается хуже отрицательного и положительного. Матрица ошибок подтверждает, что часть нейтральных отзывов переходит в отрицательный или положительный класс, поскольку отзывы с оценкой 3 часто содержат смешанные формулировки. Для пользовательского приложения результат приемлем, поскольку модель уверенно выделяет положительные и отрицательные обращения, а нейтральные сообщения сохраняются как отдельная промежуточная категория.
+
+На завершающем этапе сохраняются только необходимые артефакты для Flask-приложения.
+
+# 8. Сохранение артефактов для пользовательского приложения
+
+На завершающем этапе сохраняется итоговая модель, сведения о качестве, словарь аспектов клиентских обращений и файл зависимостей. Модель переобучается на полном сбалансированном наборе с параметрами, выбранными на предыдущем этапе. Контрольная проверка уже выполнена, поэтому полный набор можно использовать для подготовки версии, предназначенной для веб-приложения.
+
+В пользовательское приложение передается единая цепочка обработки текста: очищенный отзыв преобразуется в числовые признаки, после чего классификатор определяет тональность сообщения. Дополнительный словарь аспектов нужен для простого выделения темы обращения: сроки, стоимость, документы, коммуникация, качество работ или объект строительства.
+"""
+
+# Подключаем библиотеки для сохранения модели и служебных файлов.
+# joblib сохраняет обученную модель в файл.
+# json сохраняет сведения о модели и словари в текстовом формате.
+# platform помогает зафиксировать версию языка Python.
+# sklearn хранит номер версии библиотеки машинного обучения.
+
+import json
+import platform
+import joblib
+import sklearn
+
+
+# Задаем итоговые пути к артефактам пользовательского приложения.
+# В приложение переносится только модель, сведения о модели, словарь аспектов
+# и файл зависимостей.
+
+final_model_path = models_dir / "model.joblib"
+model_info_path = models_dir / "model_info.json"
+aspect_keywords_path = models_dir / "aspect_keywords.json"
+requirements_path = PROJECT_DIR / "requirements.txt"
+
+
+# Получаем лучшие параметры, найденные на предыдущем этапе.
+# parameter_search был создан и обучен на этапе подбора параметров.
+
+best_parameters = parameter_search.best_params_
+
+# Создаем итоговую модель с найденными параметрами.
+# Модель обучается на полном сбалансированном наборе, сохраненном на этапе 5.
+# Такой вариант получает максимум доступных учебных примеров перед переносом
+# в пользовательское приложение.
+
+final_pipeline = Pipeline(
+    steps=[
+        (
+            "text_features",
+            TfidfVectorizer(
+                max_features=best_parameters["text_features__max_features"],
+                ngram_range=best_parameters["text_features__ngram_range"],
+                min_df=best_parameters["text_features__min_df"],
+                sublinear_tf=best_parameters["text_features__sublinear_tf"],
+            )
+        ),
+        (
+            "classifier",
+            LinearSVC(
+                C=best_parameters["classifier__C"],
+                class_weight="balanced",
+                random_state=RANDOM_STATE,
+                max_iter=8000
+            )
+        ),
+    ]
+)
+
+
+# Обучаем итоговую модель на полном сбалансированном наборе.
+# Используется таблица balanced_reviews_df, полученная после балансировки классов.
+
+final_pipeline.fit(
+    balanced_reviews_df["clean_text"],
+    balanced_reviews_df["sentiment"]
+)
+
+
+# Сохраняем итоговую модель в один файл.
+# Файл model.joblib будет загружаться во Flask-приложении при запуске сервера.
+
+joblib.dump(
+    final_pipeline,
+    final_model_path
+)
+
+# Создаем словарь аспектов клиентских обращений.
+# Словарь работает как простое правило поиска ключевых слов в тексте.
+# Он не заменяет модель тональности, а дополняет ее тематической группировкой.
+
+aspect_keywords = {
+    "Сроки": [
+        "срок",
+        "задерж",
+        "долго",
+        "быстро",
+        "оперативно",
+        "ожидан",
+        "перенесли",
+        "не успели",
+        "месяц",
+        "неделя",
+    ],
+    "Стоимость": [
+        "стоимость",
+        "цена",
+        "дорого",
+        "дешево",
+        "смета",
+        "расчет",
+        "оплата",
+        "договор",
+        "деньги",
+        "переплата",
+    ],
+    "Документы": [
+        "документ",
+        "акт",
+        "договор",
+        "смета",
+        "проект",
+        "чертеж",
+        "отчет",
+        "заключение",
+        "разрешение",
+        "паспорт",
+    ],
+    "Коммуникация": [
+        "менеджер",
+        "специалист",
+        "ответ",
+        "позвонили",
+        "связались",
+        "общение",
+        "консультация",
+        "объяснили",
+        "поддержка",
+        "звонок",
+    ],
+    "Качество работ": [
+        "качество",
+        "работа",
+        "монтаж",
+        "ремонт",
+        "ошибка",
+        "дефект",
+        "замечание",
+        "проверка",
+        "контроль",
+        "переделка",
+    ],
+    "Объект строительства": [
+        "дом",
+        "квартира",
+        "здание",
+        "объект",
+        "стройка",
+        "жилой комплекс",
+        "помещение",
+        "офис",
+        "фасад",
+        "кровля",
+    ],
+}
+
+
+# Сохраняем словарь аспектов в текстовый файл.
+# ensure_ascii=False сохраняет русские буквы в читаемом виде.
+
+with open(aspect_keywords_path, "w", encoding="utf-8") as file:
+    json.dump(
+        aspect_keywords,
+        file,
+        ensure_ascii=False,
+        indent=2
+    )
+
+# Формируем сведения о модели.
+# Файл model_info.json нужен приложению и отчету: в нем указаны классы,
+# параметры итоговой модели, метрики контрольной проверки и версии библиотек.
+
+model_info = {
+    "model_name": "LinearSVC with TF-IDF features",
+    "task": "Классификация тональности клиентских отзывов",
+    "classes": class_names,
+    "class_description": {
+        "negative": "отрицательный отзыв",
+        "neutral": "нейтральный отзыв",
+        "positive": "положительный отзыв",
+    },
+    "best_parameters": {
+        "classifier_C": best_parameters["classifier__C"],
+        "max_features": best_parameters["text_features__max_features"],
+        "min_df": best_parameters["text_features__min_df"],
+        "ngram_range": list(best_parameters["text_features__ngram_range"]),
+        "sublinear_tf": best_parameters["text_features__sublinear_tf"],
+    },
+    "control_metrics": {
+        "accuracy": float(
+            final_test_comparison_df.loc[
+                final_test_comparison_df["Модель"] == "Линейный метод опорных векторов после подбора параметров",
+                "Доля правильных ответов"
+            ].iloc[0]
+        ),
+        "macro_precision": float(
+            final_test_comparison_df.loc[
+                final_test_comparison_df["Модель"] == "Линейный метод опорных векторов после подбора параметров",
+                "Точность средняя"
+            ].iloc[0]
+        ),
+        "macro_recall": float(
+            final_test_comparison_df.loc[
+                final_test_comparison_df["Модель"] == "Линейный метод опорных векторов после подбора параметров",
+                "Полнота средняя"
+            ].iloc[0]
+        ),
+        "macro_f1": float(
+            final_test_comparison_df.loc[
+                final_test_comparison_df["Модель"] == "Линейный метод опорных векторов после подбора параметров",
+                "F-мера средняя"
+            ].iloc[0]
+        ),
+    },
+    "training_data": {
+        "dataset_file": str(processed_dataset_path),
+        "records_count": int(len(balanced_reviews_df)),
+        "text_column": "clean_text",
+        "target_column": "sentiment",
+        "source": "Geo Reviews Dataset 2023 после предметной фильтрации и балансировки",
+    },
+    "software_versions": {
+        "python": platform.python_version(),
+        "scikit_learn": sklearn.__version__,
+        "pandas": pd.__version__,
+        "numpy": np.__version__,
+        "joblib": joblib.__version__,
+    },
+}
+
+
+# Сохраняем сведения о модели в файл.
+
+with open(model_info_path, "w", encoding="utf-8") as file:
+    json.dump(
+        model_info,
+        file,
+        ensure_ascii=False,
+        indent=2
+    )
+
+# Создаем файл зависимостей для запуска пользовательского приложения.
+# В файл включаются только библиотеки, нужные для загрузки модели,
+# работы Flask-приложения и обработки таблиц.
+
+requirements_lines = [
+    "Flask>=3.0.0",
+    "scikit-learn>=1.4.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "joblib>=1.3.0",
+]
+
+
+# Сохраняем зависимости в requirements.txt.
+
+with open(requirements_path, "w", encoding="utf-8") as file:
+    file.write(
+        "\n".join(requirements_lines)
+    )
+
+# Проверяем загрузку сохраненной модели.
+# Проверка имитирует работу пользовательского приложения:
+# модель загружается из файла и получает несколько новых клиентских сообщений.
+
+loaded_model = joblib.load(
+    final_model_path
+)
+
+
+# Создаем функцию для определения аспекта обращения.
+# Если найдено несколько аспектов, выбирается аспект с наибольшим числом совпадений.
+# Если совпадений нет, возвращается общее значение.
+
+def detect_aspect(text_value, aspect_dictionary):
+    text_value = str(text_value).lower().replace("ё", "е")
+
+    aspect_scores = {}
+
+    for aspect_name, keywords in aspect_dictionary.items():
+        matches_count = 0
+
+        for keyword in keywords:
+            keyword = keyword.lower().replace("ё", "е")
+
+            if keyword in text_value:
+                matches_count += 1
+
+        aspect_scores[aspect_name] = matches_count
+
+    best_aspect = max(
+        aspect_scores,
+        key=aspect_scores.get
+    )
+
+    if aspect_scores[best_aspect] == 0:
+        return "Общее обращение"
+
+    return best_aspect
+
+
+# Создаем примеры сообщений для проверки.
+# Примеры отражают возможные обращения клиента строительной компании.
+
+demo_messages = [
+    "Спасибо менеджеру за подробную консультацию по строительному контролю, все объяснили быстро и понятно.",
+    "Заявку приняли, но ответ по документам пришлось ждать несколько дней.",
+    "Не рекомендую обращаться, сроки проверки сорвали, замечания по объекту прислали слишком поздно.",
+    "Стоимость работ оказалась выше первоначального расчета, хотелось бы видеть более подробную смету.",
+    "Специалист внимательно проверил объект и помог зафиксировать дефекты в акте.",
+]
+
+
+# Получаем тональность и аспект для каждого сообщения.
+
+demo_predictions = loaded_model.predict(
+    demo_messages
+)
+
+demo_result_rows = []
+
+for message_text, sentiment_label in zip(demo_messages, demo_predictions):
+    demo_result_rows.append(
+        {
+            "Текст обращения": message_text,
+            "Тональность": sentiment_label,
+            "Аспект": detect_aspect(
+                message_text,
+                aspect_keywords
+            ),
+        }
+    )
+
+
+demo_results_df = pd.DataFrame(
+    demo_result_rows
+)
+
+demo_results_df
+
+# Формируем итоговую таблицу артефактов.
+# В таблицу включаются только файлы, нужные для приложения и проверки обучения.
+
+final_artifacts = pd.DataFrame(
+    {
+        "Артефакт": [
+            "Итоговая модель",
+            "Сведения о модели",
+            "Словарь аспектов",
+            "Файл зависимостей",
+            "Обучающий набор",
+        ],
+        "Путь": [
+            str(final_model_path),
+            str(model_info_path),
+            str(aspect_keywords_path),
+            str(requirements_path),
+            str(processed_dataset_path),
+        ],
+        "Нужен пользовательскому приложению": [
+            "да",
+            "да",
+            "да",
+            "да",
+            "нет, нужен для проверки обучения",
+        ],
+    }
+)
+
+final_artifacts
+
+# Создаем кнопку для выгрузки только тех файлов, которые нужны пользовательскому приложению.
+# В архив включаются итоговая модель, сведения о модели, словарь аспектов и файл зависимостей.
+# Обучающий набор и отчетные рисунки в архив не добавляются.
+
+import zipfile
+from pathlib import Path
+
+import ipywidgets as widgets
+from IPython.display import display
+from google.colab import files
+
+
+# Задаем путь к итоговому архиву.
+
+application_artifacts_zip_path = PROJECT_DIR / "irbis_application_artifacts.zip"
+
+
+# Описываем файлы, которые нужны пользовательскому приложению.
+# Внутренние пути сохраняют будущую структуру Flask-проекта.
+
+application_artifacts = [
+    {
+        "source_path": final_model_path,
+        "archive_path": "models/model.joblib",
+    },
+    {
+        "source_path": model_info_path,
+        "archive_path": "models/model_info.json",
+    },
+    {
+        "source_path": aspect_keywords_path,
+        "archive_path": "models/aspect_keywords.json",
+    },
+    {
+        "source_path": requirements_path,
+        "archive_path": "requirements.txt",
+    },
+]
+
+
+# Создаем функцию проверки файлов.
+# Если какой-либо файл отсутствует, выполнение останавливается с понятной ошибкой.
+
+def check_application_artifacts(artifacts):
+    missing_paths = []
+
+    for artifact in artifacts:
+        source_path = Path(artifact["source_path"])
+
+        if not source_path.exists():
+            missing_paths.append(str(source_path))
+
+    if missing_paths:
+        raise FileNotFoundError(
+            "Не найдены обязательные файлы приложения: " + "; ".join(missing_paths)
+        )
+
+
+# Создаем функцию формирования архива.
+# Архив перезаписывается при каждом нажатии кнопки.
+
+def build_application_artifacts_archive():
+    check_application_artifacts(application_artifacts)
+
+    with zipfile.ZipFile(
+        application_artifacts_zip_path,
+        mode="w",
+        compression=zipfile.ZIP_DEFLATED
+    ) as archive:
+        for artifact in application_artifacts:
+            archive.write(
+                filename=Path(artifact["source_path"]),
+                arcname=artifact["archive_path"]
+            )
+
+
+# Создаем действие для кнопки.
+# После формирования архива запускается стандартная выгрузка файла из Google Colab.
+
+def download_application_artifacts(button):
+    build_application_artifacts_archive()
+    files.download(str(application_artifacts_zip_path))
+
+
+# Создаем кнопку выгрузки.
+
+download_button = widgets.Button(
+    description="Выгрузить артефакты",
+    button_style="primary",
+    layout=widgets.Layout(
+        width="240px",
+        height="42px"
+    )
+)
+
+download_button.on_click(download_application_artifacts)
+
+display(download_button)
