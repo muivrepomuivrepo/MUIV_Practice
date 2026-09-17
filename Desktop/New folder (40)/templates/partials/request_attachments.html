@@ -1,0 +1,20 @@
+<section class="panel">
+    <h2>Файлы заявки</h2>
+    <ul class="file-list">
+        {% for attachment in request_item.attachments %}
+        <li>
+            <div>
+                <a href="{{ url_for('client.download_attachment', attachment_id=attachment.id) }}">{{ attachment.original_name }}</a>
+                <span>{{ attachment.size_label() }} · {{ attachment.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+            </div>
+            <span>Добавил: {{ attachment.uploader.full_name }}</span>
+        </li>
+        {% else %}
+        <li>Файлы к заявке пока не приложены.</li>
+        {% endfor %}
+    </ul>
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('client.upload_attachment', request_id=request_item.id) }}" class="attachment-form">
+        <label>Добавить файл<input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.txt" required></label>
+        <button class="button secondary" type="submit">Загрузить</button>
+    </form>
+</section>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}IRBIS Client Service{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/adaptive.css') }}">
+</head>
+<body>
+<header class="site-header">
+    <div class="container header-inner">
+        <a class="brand" href="{{ url_for('public.index') }}">IRBIS Client Service</a>
+        <nav class="main-nav" aria-label="Основная навигация">
+            <a href="{{ url_for('public.index') }}">Главная</a>
+            <a href="{{ url_for('public.services') }}">Услуги</a>
+            <a href="{{ url_for('public.projects') }}">Проекты</a>
+            <a href="{{ url_for('public.workflow') }}">Как мы работаем</a>
+            <a href="{{ url_for('public.reviews') }}">Отзывы</a>
+            <a href="{{ url_for('public.about') }}">О компании</a>
+            <a href="{{ url_for('public.contacts') }}">Контакты</a>
+            <a href="{{ url_for('public.faq') }}">FAQ</a>
+            <a href="{{ url_for('public.privacy') }}">Политика</a>
+            {% if current_user.is_authenticated %}
+                {% if current_user.role == 'admin' %}<a href="{{ url_for('admin.dashboard') }}">Администрирование</a>{% endif %}
+                {% if current_user.role == 'manager' %}<a href="{{ url_for('manager.dashboard') }}">Менеджер</a>{% endif %}
+                {% if current_user.role == 'client' %}<a href="{{ url_for('client.dashboard') }}">Кабинет</a>{% endif %}
+                <a href="{{ url_for('auth.logout') }}">Выход</a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}">Вход</a>
+                <a class="nav-button" href="{{ url_for('auth.register') }}">Регистрация</a>
+            {% endif %}
+        </nav>
+    </div>
+</header>
+
+{% if current_user.is_authenticated %}
+<div class="account-bar">
+    <nav class="container account-nav" aria-label="Навигация личного кабинета">
+        {% if current_user.role == 'admin' %}
+            <a class="{{ 'active' if request.endpoint == 'admin.dashboard' else '' }}" href="{{ url_for('admin.dashboard') }}">Обзор</a>
+            <a class="{{ 'active' if request.endpoint in ['admin.users', 'admin.update_role'] else '' }}" href="{{ url_for('admin.users') }}">Пользователи</a>
+            <a class="{{ 'active' if request.endpoint == 'admin.services' else '' }}" href="{{ url_for('admin.services') }}">Услуги</a>
+            <a class="{{ 'active' if request.endpoint == 'admin.projects' else '' }}" href="{{ url_for('admin.projects') }}">Проекты</a>
+            <a class="{{ 'active' if request.endpoint == 'admin.model_status' else '' }}" href="{{ url_for('admin.model_status') }}">Модель</a>
+            <a class="{{ 'active' if request.endpoint == 'admin.settings' else '' }}" href="{{ url_for('admin.settings') }}">Настройки</a>
+            <a class="{{ 'active' if request.endpoint == 'admin.audit_log' else '' }}" href="{{ url_for('admin.audit_log') }}">Журнал действий</a>
+            <a class="{{ 'active' if request.endpoint == 'notifications.index' else '' }}" href="{{ url_for('notifications.index') }}">Уведомления{% if current_user.unread_notifications_count() %} ({{ current_user.unread_notifications_count() }}){% endif %}</a>
+        {% elif current_user.role == 'manager' %}
+            <a class="{{ 'active' if request.endpoint == 'manager.dashboard' else '' }}" href="{{ url_for('manager.dashboard') }}">Обзор</a>
+            <a class="{{ 'active' if request.endpoint in ['manager.requests_list', 'manager.request_detail'] else '' }}" href="{{ url_for('manager.requests_list') }}">Заявки</a>
+            <a class="{{ 'active' if request.endpoint == 'manager.clients' else '' }}" href="{{ url_for('manager.clients') }}">Клиенты</a>
+            <a class="{{ 'active' if request.endpoint in ['manager.reports', 'manager.generate_report_file', 'manager.download_report', 'manager.export_report'] else '' }}" href="{{ url_for('manager.reports') }}">Отчеты</a>
+            <a class="{{ 'active' if request.endpoint == 'manager.contact_messages' else '' }}" href="{{ url_for('manager.contact_messages') }}">Сообщения</a>
+            <a class="{{ 'active' if request.endpoint == 'notifications.index' else '' }}" href="{{ url_for('notifications.index') }}">Уведомления{% if current_user.unread_notifications_count() %} ({{ current_user.unread_notifications_count() }}){% endif %}</a>
+        {% elif current_user.role == 'client' %}
+            <a class="{{ 'active' if request.endpoint in ['client.dashboard', 'client.request_detail', 'client.create_feedback'] else '' }}" href="{{ url_for('client.dashboard') }}">Мои заявки</a>
+            <a class="{{ 'active' if request.endpoint == 'client.create_request_view' else '' }}" href="{{ url_for('client.create_request_view') }}">Новая заявка</a>
+            <a class="{{ 'active' if request.endpoint == 'client.profile' else '' }}" href="{{ url_for('client.profile') }}">Профиль</a>
+            <a class="{{ 'active' if request.endpoint == 'notifications.index' else '' }}" href="{{ url_for('notifications.index') }}">Уведомления{% if current_user.unread_notifications_count() %} ({{ current_user.unread_notifications_count() }}){% endif %}</a>
+        {% endif %}
+    </nav>
+</div>
+{% endif %}
+
+<main>
+    <div class="container flash-area">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+    <div class="container breadcrumb-wrap">
+        {% include 'partials/breadcrumbs.html' %}
+    </div>
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+    <div class="container footer-grid">
+        <div>
+            <strong>ООО «ГК «ИРБИС»»</strong>
+            <p>Демонстрационный веб-сервис для автоматизации клиентских обращений.</p>
+        </div>
+        <div>
+            <a href="{{ url_for('public.privacy') }}">Политика обработки данных</a>
+            <p class="footer-author">Автор работы: Kuleshov Nikita Vyacheslavovich</p>
+        </div>
+    </div>
+</footer>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

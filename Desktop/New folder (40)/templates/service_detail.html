@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ service.title }}{% endblock %}
+{% block content %}
+<section class="container section narrow">
+    <h1>{{ service.title }}</h1>
+    <p class="lead">{{ service.short_description }}</p>
+    <p>{{ service.full_description }}</p>
+    <a class="button" href="{{ url_for('client.create_request_view') }}">Создать заявку</a>
+</section>
+{% endblock %}

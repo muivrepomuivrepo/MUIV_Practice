@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Как мы работаем{% endblock %}
+{% block content %}
+<section class="container section">
+    <div class="page-header">
+        <div>
+            <h1>Как мы работаем</h1>
+            <p class="lead">Путь обращения от регистрации до итоговой обратной связи.</p>
+        </div>
+        <a class="button" href="{{ url_for('auth.register') }}">Создать обращение</a>
+    </div>
+    <div class="cards-grid">
+        <article class="card"><span class="badge">Шаг 1</span><h2>Заявка</h2><p>Клиент выбирает услугу, описывает задачу, адрес объекта и приоритет обращения.</p></article>
+        <article class="card"><span class="badge">Шаг 2</span><h2>Назначение</h2><p>Менеджер принимает обращение, назначает ответственного и уточняет необходимые данные.</p></article>
+        <article class="card"><span class="badge">Шаг 3</span><h2>Сопровождение</h2><p>Статус и комментарии сохраняются в карточке заявки и доступны участникам процесса.</p></article>
+        <article class="card"><span class="badge">Шаг 4</span><h2>Результат</h2><p>После выполнения работ клиент получает результат и может оставить подробный отзыв.</p></article>
+        <article class="card"><span class="badge">Шаг 5</span><h2>Анализ</h2><p>Сервис определяет тональность и тему отзыва для последующей управленческой отчетности.</p></article>
+    </div>
+</section>
+{% endblock %}

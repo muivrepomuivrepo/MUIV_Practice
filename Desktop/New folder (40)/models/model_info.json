@@ -1,0 +1,44 @@
+{
+  "model_name": "LinearSVC with TF-IDF features",
+  "task": "Классификация тональности клиентских отзывов",
+  "classes": [
+    "negative",
+    "neutral",
+    "positive"
+  ],
+  "class_description": {
+    "negative": "отрицательный отзыв",
+    "neutral": "нейтральный отзыв",
+    "positive": "положительный отзыв"
+  },
+  "best_parameters": {
+    "classifier_C": 0.7,
+    "max_features": 8000,
+    "min_df": 1,
+    "ngram_range": [
+      1,
+      2
+    ],
+    "sublinear_tf": true
+  },
+  "control_metrics": {
+    "accuracy": 0.7165,
+    "macro_precision": 0.7124,
+    "macro_recall": 0.7159,
+    "macro_f1": 0.7132
+  },
+  "training_data": {
+    "dataset_file": "/content/irbis_feedback_experiment/data/processed/irbis_feedback_dataset.csv",
+    "records_count": 1692,
+    "text_column": "clean_text",
+    "target_column": "sentiment",
+    "source": "Geo Reviews Dataset 2023 после предметной фильтрации и балансировки"
+  },
+  "software_versions": {
+    "python": "3.12.13",
+    "scikit_learn": "1.6.1",
+    "pandas": "2.2.2",
+    "numpy": "2.0.2",
+    "joblib": "1.5.3"
+  }
+}

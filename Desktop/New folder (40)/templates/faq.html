@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}FAQ{% endblock %}
+{% block content %}
+<section class="container section narrow">
+    <h1>Частые вопросы</h1>
+    <details open><summary>Как создать заявку?</summary><p>Зарегистрируйтесь, войдите в личный кабинет и выберите услугу.</p></details>
+    <details><summary>Как работает анализ отзывов?</summary><p>Система применяет сохраненную модель и словарь аспектов, затем сохраняет результат в карточке заявки.</p></details>
+    <details><summary>Что делать, если модель не подключена?</summary><p>Добавьте файлы `model.joblib`, `model_info.json` и `aspect_keywords.json` в папку `models` и перезапустите приложение.</p></details>
+</section>
+{% endblock %}

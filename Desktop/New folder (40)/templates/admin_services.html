@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Услуги{% endblock %}
+{% block content %}
+<section class="container section">
+    <h1>Управление услугами</h1>
+    <form method="post" class="form-card">
+        <label>Название<input name="title"></label>
+        <label>Ссылочный код<input name="slug"></label>
+        <label>Краткое описание<input name="short_description"></label>
+        <label>Полное описание<textarea name="full_description" rows="4"></textarea></label>
+        <button class="button">Добавить</button>
+    </form>
+    <div class="cards-grid">{% for service in services %}<article class="card"><h3>{{ service.title }}</h3><p>{{ service.short_description }}</p></article>{% endfor %}</div>
+</section>
+{% endblock %}

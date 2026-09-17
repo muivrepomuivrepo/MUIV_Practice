@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Состояние модели{% endblock %}
+{% block content %}
+<section class="container section narrow">
+    <h1>Состояние модели</h1>
+    {% if model_status["available"] %}
+        <div class="alert alert-success">Модель подключена и готова к работе.</div>
+    {% else %}
+        <div class="alert alert-warning">Файл models/model.joblib не найден. Добавьте артефакты и перезапустите приложение.</div>
+    {% endif %}
+    <pre class="code-block">{{ model_info_json }}</pre>
+</section>
+{% endblock %}

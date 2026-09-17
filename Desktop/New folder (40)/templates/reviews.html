@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Отзывы клиентов{% endblock %}
+{% block content %}
+<section class="container section">
+    <div class="page-header">
+        <div>
+            <h1>Отзывы клиентов</h1>
+            <p class="lead">Обратная связь по завершенным и текущим обращениям.</p>
+        </div>
+        <a class="button secondary" href="{{ url_for('public.services') }}">Выбрать услугу</a>
+    </div>
+    <div class="cards-grid">
+        {% for feedback in feedback_items %}
+        <article class="card">
+            <div class="feedback {{ feedback.sentiment }}">
+                <strong>{{ feedback.sentiment_label() }}</strong>
+                <span>{{ feedback.aspect }}</span>
+            </div>
+            <p>{{ feedback.text }}</p>
+            <p class="review-meta">{{ feedback.author.full_name }} · заявка #{{ feedback.request_id }} · {{ feedback.created_at.strftime('%d.%m.%Y') }}</p>
+        </article>
+        {% else %}
+        <article class="card"><p>Опубликованных отзывов пока нет.</p></article>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

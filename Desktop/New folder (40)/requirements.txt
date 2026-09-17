@@ -1,0 +1,10 @@
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+scikit-learn==1.6.1
+numpy==1.26.4
+joblib==1.5.2
+Werkzeug==3.0.3
+gunicorn==23.0.0
+openpyxl==3.1.5
+python-docx==1.2.0

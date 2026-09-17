@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Профиль клиента{% endblock %}
+{% block content %}
+<section class="container section narrow">
+    <div class="page-header">
+        <div>
+            <h1>Профиль клиента</h1>
+            <p class="lead">Контактные данные для связи по заявкам.</p>
+        </div>
+        <a class="button secondary" href="{{ url_for('client.dashboard') }}">К заявкам</a>
+    </div>
+    <form method="post" class="form-card">
+        <label>Логин<input value="{{ current_user.username }}" disabled></label>
+        <label>ФИО<input name="full_name" value="{{ request.form.get('full_name', current_user.full_name) }}" required></label>
+        <label>Электронная почта<input type="email" name="email" value="{{ request.form.get('email', current_user.email) }}" required></label>
+        <label>Телефон<input name="phone" value="{{ request.form.get('phone', current_user.phone or '') }}"></label>
+        <label>Компания<input name="company" value="{{ request.form.get('company', current_user.company or '') }}"></label>
+        <button class="button" type="submit">Сохранить изменения</button>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Кабинет менеджера{% endblock %}
+{% block content %}
+<section class="container section">
+    <div class="page-header"><div><h1>Кабинет менеджера</h1><p class="lead">Обработка заявок и обратной связи.</p></div><div class="actions-row dashboard-actions"><a class="button secondary" href="{{ url_for('manager.contact_messages') }}">Сообщения</a><a class="button secondary" href="{{ url_for('manager.clients') }}">Клиенты</a><a class="button" href="{{ url_for('manager.reports') }}">Отчеты</a></div></div>
+    <div class="stats-grid">
+        <div class="stat-card"><strong>{{ new_messages_count }}</strong><span>Новые сообщения</span></div>
+        {% for status, count in status_stats.items() %}<div class="stat-card"><strong>{{ count }}</strong><span>{{ status }}</span></div>{% endfor %}
+        {% for sentiment, count in sentiment_stats.items() %}<div class="stat-card"><strong>{{ count }}</strong><span>{{ sentiment }}</span></div>{% endfor %}
+    </div>
+    <h2>Последние заявки</h2>
+    {% include 'partials/request_table.html' %}
+</section>
+{% endblock %}

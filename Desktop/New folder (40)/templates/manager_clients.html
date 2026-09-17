@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Клиенты{% endblock %}
+{% block content %}
+<section class="container section">
+    <div class="page-header">
+        <div>
+            <h1>Клиенты</h1>
+            <p class="lead">Контактные данные и количество обращений зарегистрированных клиентов.</p>
+        </div>
+        <a class="button" href="{{ url_for('manager.requests_list') }}">Все заявки</a>
+    </div>
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr><th>ФИО</th><th>Компания</th><th>Электронная почта</th><th>Телефон</th><th>Заявки</th></tr>
+            </thead>
+            <tbody>
+            {% for client in clients %}
+                <tr>
+                    <td>{{ client.full_name }}</td>
+                    <td>{{ client.company or '—' }}</td>
+                    <td><a href="mailto:{{ client.email }}">{{ client.email }}</a></td>
+                    <td>{{ client.phone or '—' }}</td>
+                    <td>{{ client.requests|length }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5">Зарегистрированных клиентов пока нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

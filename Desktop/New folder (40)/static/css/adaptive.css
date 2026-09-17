@@ -1,0 +1,16 @@
+@media (max-width: 900px) {
+    .header-inner { align-items: flex-start; flex-direction: column; padding: 16px 0; }
+    .hero-grid, .detail-grid, .report-grid { grid-template-columns: 1fr; }
+    .cards-grid { grid-template-columns: repeat(2, 1fr); }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .cards-grid, .stats-grid { grid-template-columns: 1fr; }
+    .page-header, .footer-grid { flex-direction: column; align-items: flex-start; }
+    .meta-list { grid-template-columns: 1fr; }
+    .main-nav { gap: 10px; }
+    .account-nav { padding-top: 8px; padding-bottom: 8px; }
+    .attachment-form { grid-template-columns: 1fr; }
+    .report-form { grid-template-columns: 1fr; }
+    .file-list li, .notification-item { flex-direction: column; }
+}

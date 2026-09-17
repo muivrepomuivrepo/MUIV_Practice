@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Управление проектами{% endblock %}
+{% block content %}
+<section class="container section">
+    <h1>Управление проектами</h1>
+    <form method="post" class="form-card">
+        <label>Название<input name="title" required></label>
+        <label>Ссылочный код<input name="slug" placeholder="project-slug" required></label>
+        <label>Город или регион<input name="city" required></label>
+        <label>Описание<textarea name="description" rows="4" required></textarea></label>
+        <button class="button" type="submit">Опубликовать проект</button>
+    </form>
+    <div class="cards-grid">
+        {% for project in projects %}
+        <article class="card"><span class="badge">{{ project.city }}</span><h2>{{ project.title }}</h2><p>{{ project.description }}</p></article>
+        {% else %}
+        <article class="card"><p>Проекты пока не добавлены.</p></article>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

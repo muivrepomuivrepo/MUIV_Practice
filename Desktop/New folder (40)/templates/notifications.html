@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Уведомления{% endblock %}
+{% block content %}
+<section class="container section narrow">
+    <div class="page-header">
+        <div><h1>Уведомления</h1><p class="lead">Изменения по заявкам и новые события системы.</p></div>
+        {% if current_user.unread_notifications_count() %}
+        <form method="post" action="{{ url_for('notifications.mark_all_read') }}">
+            <button class="button secondary" type="submit">Прочитать все</button>
+        </form>
+        {% endif %}
+    </div>
+    <div class="notification-list">
+        {% for item in notifications %}
+        <article class="panel notification-item {{ 'unread' if not item.is_read else '' }}">
+            <div>
+                <h2>{{ item.title }}</h2>
+                <p>{{ item.message }}</p>
+                <time>{{ item.created_at.strftime('%d.%m.%Y %H:%M') }}</time>
+            </div>
+            <div class="actions-row dashboard-actions">
+                {% if item.related_request_id %}
+                    {% if current_user.role == 'client' %}
+                    <a class="button secondary" href="{{ url_for('client.request_detail', request_id=item.related_request_id) }}">Открыть заявку</a>
+                    {% else %}
+                    <a class="button secondary" href="{{ url_for('manager.request_detail', request_id=item.related_request_id) }}">Открыть заявку</a>
+                    {% endif %}
+                {% endif %}
+                {% if not item.is_read %}
+                <form method="post" action="{{ url_for('notifications.mark_read', notification_id=item.id) }}"><button class="small-button" type="submit">Отметить прочитанным</button></form>
+                {% endif %}
+            </div>
+        </article>
+        {% else %}
+        <div class="panel"><p>Уведомлений пока нет.</p></div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

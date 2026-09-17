@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Журнал действий{% endblock %}
+{% block content %}
+<section class="container section">
+    <div class="page-header">
+        <div>
+            <h1>Журнал действий</h1>
+            <p class="lead">Последние изменения в заявках, профилях, услугах и правах доступа.</p>
+        </div>
+        <a class="button secondary" href="{{ url_for('admin.dashboard') }}">К обзору</a>
+    </div>
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr><th>Дата и время</th><th>Пользователь</th><th>Действие</th><th>Объект</th><th>Подробности</th></tr>
+            </thead>
+            <tbody>
+            {% for entry in log_entries %}
+                <tr>
+                    <td>{{ entry.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                    <td>{{ entry.user.full_name if entry.user else 'Система' }}</td>
+                    <td>{{ entry.action }}</td>
+                    <td>{{ entry.entity_type or '—' }}{% if entry.entity_id %} #{{ entry.entity_id }}{% endif %}</td>
+                    <td>{{ entry.details or '—' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5">Записей в журнале пока нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

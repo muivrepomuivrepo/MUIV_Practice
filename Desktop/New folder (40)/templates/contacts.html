@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Контакты{% endblock %}
+{% block content %}
+<section class="container section narrow">
+    <h1>Контакты</h1>
+    <p>Санкт-Петербург. Отправленное сообщение сохраняется в системе и поступает менеджеру клиентского отдела.</p>
+    <form method="post" class="form-card">
+        <label>Имя<input name="name" value="{{ request.form.get('name', '') }}" required></label>
+        <label>Электронная почта<input name="email" type="email" value="{{ request.form.get('email', '') }}" required></label>
+        <label>Телефон<input name="phone" value="{{ request.form.get('phone', '') }}"></label>
+        <label>Сообщение<textarea name="message" rows="5" required>{{ request.form.get('message', '') }}</textarea></label>
+        <label class="checkbox-label"><input type="checkbox" name="consent" value="yes" required> Согласен на обработку данных для ответа на обращение</label>
+        <button class="button" type="submit">Отправить</button>
+    </form>
+</section>
+{% endblock %}

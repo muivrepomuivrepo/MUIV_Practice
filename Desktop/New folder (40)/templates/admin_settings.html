@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Системные настройки{% endblock %}
+{% block content %}
+<section class="container section narrow">
+    <h1>Системные настройки</h1>
+    <p class="lead">Основные параметры веб-сервиса, хранящиеся в базе данных.</p>
+    <form method="post" class="form-card">
+        {% for setting in settings %}
+        <label>{{ setting.description or setting.key }}
+            <input name="setting_{{ setting.id }}" value="{{ setting.value }}">
+            <small>Ключ: {{ setting.key }}</small>
+        </label>
+        {% else %}
+        <p>Настройки пока не созданы.</p>
+        {% endfor %}
+        {% if settings %}<button class="button" type="submit">Сохранить настройки</button>{% endif %}
+    </form>
+</section>
+{% endblock %}

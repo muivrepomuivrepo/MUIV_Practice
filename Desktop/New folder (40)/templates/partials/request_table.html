@@ -1,0 +1,19 @@
+<div class="table-card">
+<table>
+    <thead><tr><th>Номер</th><th>Клиент</th><th>Название</th><th>Услуга</th><th>Статус</th><th>Приоритет</th></tr></thead>
+    <tbody>
+    {% for item in requests %}
+    <tr>
+        <td>#{{ item.id }}</td>
+        <td>{{ item.client.full_name }}</td>
+        <td><a href="{{ url_for('manager.request_detail', request_id=item.id) }}">{{ item.title }}</a></td>
+        <td>{{ item.service.title }}</td>
+        <td>{{ item.status_label() }}</td>
+        <td>{{ item.priority_label() }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">Заявки не найдены.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>

@@ -1,0 +1,95 @@
+{% set endpoint = request.endpoint or '' %}
+<nav class="breadcrumbs" aria-label="Хлебные крошки">
+    <ol>
+        {% if endpoint == 'public.index' %}
+            <li aria-current="page">Главная</li>
+        {% else %}
+            <li><a href="{{ url_for('public.index') }}">Главная</a></li>
+        {% endif %}
+
+        {% if endpoint == 'public.services' %}
+            <li aria-current="page">Услуги</li>
+        {% elif endpoint == 'public.service_detail' %}
+            <li><a href="{{ url_for('public.services') }}">Услуги</a></li>
+            <li aria-current="page">{{ service.title }}</li>
+        {% elif endpoint == 'public.projects' %}
+            <li aria-current="page">Проекты</li>
+        {% elif endpoint == 'public.workflow' %}
+            <li aria-current="page">Как мы работаем</li>
+        {% elif endpoint == 'public.reviews' %}
+            <li aria-current="page">Отзывы клиентов</li>
+        {% elif endpoint == 'public.about' %}
+            <li aria-current="page">О компании</li>
+        {% elif endpoint == 'public.contacts' %}
+            <li aria-current="page">Контакты</li>
+        {% elif endpoint == 'public.faq' %}
+            <li aria-current="page">Частые вопросы</li>
+        {% elif endpoint == 'public.privacy' %}
+            <li aria-current="page">Политика обработки данных</li>
+
+        {% elif endpoint == 'auth.login' %}
+            <li aria-current="page">Вход</li>
+        {% elif endpoint == 'auth.register' %}
+            <li aria-current="page">Регистрация</li>
+
+        {% elif endpoint == 'client.dashboard' %}
+            <li aria-current="page">Кабинет клиента</li>
+        {% elif endpoint == 'client.create_request_view' %}
+            <li><a href="{{ url_for('client.dashboard') }}">Кабинет клиента</a></li>
+            <li aria-current="page">Новая заявка</li>
+        {% elif endpoint == 'client.request_detail' %}
+            <li><a href="{{ url_for('client.dashboard') }}">Кабинет клиента</a></li>
+            <li aria-current="page">Заявка #{{ request_item.id }}</li>
+        {% elif endpoint == 'client.create_feedback' %}
+            <li><a href="{{ url_for('client.dashboard') }}">Кабинет клиента</a></li>
+            <li><a href="{{ url_for('client.request_detail', request_id=request_item.id) }}">Заявка #{{ request_item.id }}</a></li>
+            <li aria-current="page">Отзыв</li>
+        {% elif endpoint == 'client.profile' %}
+            <li><a href="{{ url_for('client.dashboard') }}">Кабинет клиента</a></li>
+            <li aria-current="page">Профиль</li>
+
+        {% elif endpoint == 'manager.dashboard' %}
+            <li aria-current="page">Кабинет менеджера</li>
+        {% elif endpoint == 'manager.requests_list' %}
+            <li><a href="{{ url_for('manager.dashboard') }}">Кабинет менеджера</a></li>
+            <li aria-current="page">Заявки</li>
+        {% elif endpoint == 'manager.request_detail' %}
+            <li><a href="{{ url_for('manager.dashboard') }}">Кабинет менеджера</a></li>
+            <li><a href="{{ url_for('manager.requests_list') }}">Заявки</a></li>
+            <li aria-current="page">Заявка #{{ request_item.id }}</li>
+        {% elif endpoint == 'manager.clients' %}
+            <li><a href="{{ url_for('manager.dashboard') }}">Кабинет менеджера</a></li>
+            <li aria-current="page">Клиенты</li>
+        {% elif endpoint in ['manager.reports', 'manager.generate_report_file', 'manager.download_report', 'manager.export_report'] %}
+            <li><a href="{{ url_for('manager.dashboard') }}">Кабинет менеджера</a></li>
+            <li aria-current="page">Отчеты</li>
+        {% elif endpoint == 'manager.contact_messages' %}
+            <li><a href="{{ url_for('manager.dashboard') }}">Кабинет менеджера</a></li>
+            <li aria-current="page">Обратная связь</li>
+
+        {% elif endpoint == 'notifications.index' %}
+            <li aria-current="page">Уведомления</li>
+
+        {% elif endpoint == 'admin.dashboard' %}
+            <li aria-current="page">Административная панель</li>
+        {% elif endpoint == 'admin.users' %}
+            <li><a href="{{ url_for('admin.dashboard') }}">Административная панель</a></li>
+            <li aria-current="page">Пользователи</li>
+        {% elif endpoint == 'admin.services' %}
+            <li><a href="{{ url_for('admin.dashboard') }}">Административная панель</a></li>
+            <li aria-current="page">Управление услугами</li>
+        {% elif endpoint == 'admin.model_status' %}
+            <li><a href="{{ url_for('admin.dashboard') }}">Административная панель</a></li>
+            <li aria-current="page">Состояние модели</li>
+        {% elif endpoint == 'admin.projects' %}
+            <li><a href="{{ url_for('admin.dashboard') }}">Административная панель</a></li>
+            <li aria-current="page">Управление проектами</li>
+        {% elif endpoint == 'admin.settings' %}
+            <li><a href="{{ url_for('admin.dashboard') }}">Административная панель</a></li>
+            <li aria-current="page">Системные настройки</li>
+        {% elif endpoint == 'admin.audit_log' %}
+            <li><a href="{{ url_for('admin.dashboard') }}">Административная панель</a></li>
+            <li aria-current="page">Журнал действий</li>
+        {% endif %}
+    </ol>
+</nav>
